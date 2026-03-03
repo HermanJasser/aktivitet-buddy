@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "aktivitet-buddy",
+    "slug": "aktivitet-buddy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "aktivitet-buddy bruker posisjonen din for å vise aktiviteter i nærheten.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "aktivitet-buddy bruker posisjonen din for å vise aktiviteter i nærheten."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
