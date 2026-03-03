@@ -5,11 +5,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, ActivityIndicator, View, StyleSheet } from 'react-native';
 
 import { useAuth } from './hooks/useAuth';
-import LoginScreen from './app/(auth)/login';
-import RegisterScreen from './app/(auth)/register';
-import MapScreen from './app/(tabs)/map';
-import ActivitiesScreen from './app/(tabs)/activities';
-import ProfileScreen from './app/(tabs)/profile';
+import LoginScreen from './screens/auth/login';
+import RegisterScreen from './screens/auth/register';
+import MapScreen from './screens/tabs/map';
+import ActivitiesScreen from './screens/tabs/activities';
+import ProfileScreen from './screens/tabs/profile';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
