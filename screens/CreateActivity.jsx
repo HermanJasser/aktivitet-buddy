@@ -176,10 +176,9 @@ export default function CreateActivity({ navigation }) {
             <DateTimePicker
               value={scheduledAt}
               mode={pickerMode}
-              display="spinner"
+              display="inline"
               onChange={onDateChange}
               minimumDate={pickerMode === 'date' ? new Date() : undefined}
-              locale="nb-NO"
               style={styles.picker}
             />
           )}
