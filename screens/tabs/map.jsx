@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { supabase } from '../../lib/supabase';
+import ActivityPin from '../../components/ActivityPin';
 
 const OSLO_REGION = {
   latitude: 59.9139,
@@ -10,10 +12,11 @@ const OSLO_REGION = {
   longitudeDelta: 0.1,
 };
 
-export default function MapScreen() {
+export default function MapScreen({ navigation }) {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -21,13 +24,23 @@ export default function MapScreen() {
       if (status !== 'granted') {
         setErrorMsg('Posisjonstilgang nektet — viser Oslo som standard.');
         setLoading(false);
-        return;
+      } else {
+        const loc = await Location.getCurrentPositionAsync({});
+        setLocation(loc.coords);
+        setLoading(false);
       }
-      const loc = await Location.getCurrentPositionAsync({});
-      setLocation(loc.coords);
-      setLoading(false);
     })();
+    fetchActivities();
   }, []);
+
+  async function fetchActivities() {
+    const { data } = await supabase
+      .from('activities')
+      .select('*')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null);
+    if (data) setActivities(data);
+  }
 
   const region = location
     ? {
@@ -61,7 +74,15 @@ export default function MapScreen() {
         showsUserLocation={!!location}
         showsMyLocationButton
       >
-        {/* Aktivitetspins legges til her */}
+        {activities.map((activity) => (
+          <ActivityPin
+            key={activity.id}
+            activity={activity}
+            onProfilePress={(userId) =>
+              navigation.navigate('UserProfile', { userId })
+            }
+          />
+        ))}
       </MapView>
     </View>
   );

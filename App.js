@@ -10,6 +10,8 @@ import RegisterScreen from './screens/auth/register';
 import MapScreen from './screens/tabs/map';
 import ActivitiesScreen from './screens/tabs/activities';
 import ProfileScreen from './screens/tabs/profile';
+import CreateActivity from './screens/CreateActivity';
+import UserProfile from './screens/UserProfile';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -26,7 +28,6 @@ function MainTabs() {
         tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
         tabBarActiveTintColor: '#1a73e8',
         tabBarInactiveTintColor: '#aaa',
-        headerShown: false,
       })}
     >
       <Tab.Screen name="Kart" component={MapScreen} />
@@ -45,6 +46,33 @@ function AuthStack() {
   );
 }
 
+function MainStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="CreateActivity"
+        component={CreateActivity}
+        options={{
+          title: 'Ny aktivitet',
+          presentation: 'modal',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#1a73e8',
+        }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfile}
+        options={{
+          title: 'Profil',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#1a73e8',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export default function App() {
   const { session, loading } = useAuth();
 
@@ -58,7 +86,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      {session ? <MainTabs /> : <AuthStack />}
+      {session ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   );
 }

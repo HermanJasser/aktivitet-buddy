@@ -1,17 +1,41 @@
-import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import ActivityCard from '../../components/ActivityCard';
 
-export default function ActivitiesScreen() {
+export default function ActivitiesScreen({ navigation }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchActivities();
-  }, []);
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CreateActivity')}
+          style={{ marginRight: 16 }}
+        >
+          <Text style={{ fontSize: 28, color: '#1a73e8', fontWeight: '300' }}>+</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActivities();
+    }, [])
+  );
 
   async function fetchActivities() {
+    setLoading(true);
     const { data, error } = await supabase
       .from('activities')
       .select('*')
@@ -38,7 +62,7 @@ export default function ActivitiesScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>Ingen aktiviteter enda.</Text>
-            <Text style={styles.emptySubtext}>Koble til Supabase for å se aktiviteter.</Text>
+            <Text style={styles.emptySubtext}>Trykk + for å opprette den første.</Text>
           </View>
         }
         contentContainerStyle={activities.length === 0 && styles.emptyContainer}
