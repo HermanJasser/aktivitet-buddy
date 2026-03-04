@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Modal,
   StyleSheet,
   Alert,
   Platform,
@@ -28,9 +29,7 @@ export default function CreateActivity({ navigation }) {
   const [type, setType] = useState(null);
   const [description, setDescription] = useState('');
   const [scheduledAt, setScheduledAt] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [pickerMode, setPickerMode] = useState('date');
+  const [pickerMode, setPickerMode] = useState(null); // null | 'date' | 'time'
   const [location, setLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,23 +51,8 @@ export default function CreateActivity({ navigation }) {
   }
 
   function onDateChange(event, selectedDate) {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      setShowTimePicker(false);
-    }
     if (selectedDate) setScheduledAt(selectedDate);
-  }
-
-  function openDatePicker() {
-    setPickerMode('date');
-    setShowDatePicker(true);
-    setShowTimePicker(false);
-  }
-
-  function openTimePicker() {
-    setPickerMode('time');
-    setShowTimePicker(true);
-    setShowDatePicker(false);
+    if (Platform.OS === 'android') setPickerMode(null);
   }
 
   async function handleSave() {
@@ -118,7 +102,11 @@ export default function CreateActivity({ navigation }) {
   });
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <Text style={styles.label}>Tittel *</Text>
       <TextInput
         style={styles.input}
@@ -150,27 +138,53 @@ export default function CreateActivity({ navigation }) {
         onChangeText={setDescription}
         multiline
         numberOfLines={3}
+        returnKeyType="done"
+        blurOnSubmit
       />
 
       <Text style={styles.label}>Tidspunkt *</Text>
       <View style={styles.dateRow}>
-        <TouchableOpacity style={styles.dateButton} onPress={openDatePicker}>
+        <TouchableOpacity style={styles.dateButton} onPress={() => setPickerMode('date')}>
           <Text style={styles.dateButtonText}>{formattedDate}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.dateButton} onPress={openTimePicker}>
+        <TouchableOpacity style={styles.dateButton} onPress={() => setPickerMode('time')}>
           <Text style={styles.dateButtonText}>{formattedTime}</Text>
         </TouchableOpacity>
       </View>
 
-      {(showDatePicker || showTimePicker) && (
-        <DateTimePicker
-          value={scheduledAt}
-          mode={pickerMode}
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          onChange={onDateChange}
-          minimumDate={new Date()}
+      <Modal
+        visible={pickerMode !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerMode(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setPickerMode(null)}
         />
-      )}
+        <View style={styles.pickerModal}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>
+              {pickerMode === 'date' ? 'Velg dato' : 'Velg tidspunkt'}
+            </Text>
+            <TouchableOpacity onPress={() => setPickerMode(null)}>
+              <Text style={styles.pickerDone}>Ferdig</Text>
+            </TouchableOpacity>
+          </View>
+          {pickerMode !== null && (
+            <DateTimePicker
+              value={scheduledAt}
+              mode={pickerMode}
+              display="spinner"
+              onChange={onDateChange}
+              minimumDate={pickerMode === 'date' ? new Date() : undefined}
+              locale="nb-NO"
+              style={styles.picker}
+            />
+          )}
+        </View>
+      </Modal>
 
       <Text style={styles.label}>Lokasjon *</Text>
       <View style={styles.locationRow}>
@@ -366,5 +380,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  pickerModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 30,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  pickerDone: {
+    fontSize: 16,
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  picker: {
+    width: '100%',
   },
 });
