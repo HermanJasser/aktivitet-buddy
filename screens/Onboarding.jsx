@@ -14,16 +14,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+
+const MAX_BIRTH_DATE = (() => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d;
+})();
 
 const ACTIVITIES = [
   'Fotball', 'Basket', 'Håndball', 'Volleyball', 'Tennis', 'Padel',
   'Squash', 'Bordtennis', 'Løping', 'Sykling', 'Svømming', 'Trening',
   'Klatring', 'Fjelltur', 'Slalom', 'Randone', 'Skating', 'Skøyting', 'Fisking',
 ];
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS_NEW = 5;
+const TOTAL_STEPS_EDIT = 4;
 
 export default function OnboardingScreen({ route, navigation }) {
   const editing = route?.params?.editing ?? false;
@@ -37,7 +45,8 @@ export default function OnboardingScreen({ route, navigation }) {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [bio, setBio] = useState('');
   const [selectedActivities, setSelectedActivities] = useState([]);
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -61,7 +70,7 @@ export default function OnboardingScreen({ route, navigation }) {
       setFullName(profile.full_name ?? '');
       setBio(profile.bio ?? '');
       setSelectedActivities(profile.preferred_activities ?? []);
-      setAge(profile.age ? String(profile.age) : '');
+      setBirthDate(profile.birth_date ? new Date(profile.birth_date) : null);
       setAvatarUrl(profile.avatar_url ?? null);
     }
   }, [editing, profile]);
@@ -114,6 +123,11 @@ export default function OnboardingScreen({ route, navigation }) {
       setStep(1);
       return;
     }
+    if (!editing && (!birthDate || birthDate > MAX_BIRTH_DATE)) {
+      Alert.alert('Du må være over 18', 'Du må være minst 18 år for å bruke appen.');
+      setStep(5);
+      return;
+    }
     setSaving(true);
     try {
       const uploadedUrl = await uploadAvatar();
@@ -122,7 +136,7 @@ export default function OnboardingScreen({ route, navigation }) {
         full_name: fullName.trim(),
         bio: bio.trim() || null,
         preferred_activities: selectedActivities,
-        age: age ? parseInt(age, 10) : null,
+        birth_date: birthDate ? birthDate.toISOString().split('T')[0] : undefined,
         avatar_url: uploadedUrl ?? null,
         updated_at: new Date().toISOString(),
       });
@@ -162,7 +176,7 @@ export default function OnboardingScreen({ route, navigation }) {
   function renderProgressDots() {
     return (
       <View style={styles.dots}>
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        {Array.from({ length: totalSteps }).map((_, i) => (
           <View
             key={i}
             style={[styles.dot, i + 1 === step && styles.dotActive, i + 1 < step && styles.dotDone]}
@@ -265,22 +279,23 @@ export default function OnboardingScreen({ route, navigation }) {
       case 5:
         return (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Hvor gammel er du?</Text>
-            <Text style={styles.stepSubtitle}>Alder vises på profilen din (valgfritt)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Alder"
-              value={age}
-              onChangeText={setAge}
-              keyboardType="number-pad"
-              autoFocus
-            />
+            <Text style={styles.stepTitle}>Når er du født?</Text>
+            <Text style={styles.stepSubtitle}>Du må være minst 18 år for å bruke appen</Text>
+            <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+              <Text style={birthDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+                {birthDate ? birthDate.toLocaleDateString('nb-NO') : 'Velg fødselsdato'}
+              </Text>
+            </TouchableOpacity>
+            {birthDate && birthDate > MAX_BIRTH_DATE && (
+              <Text style={styles.ageError}>Du må være minst 18 år gammel</Text>
+            )}
           </View>
         );
     }
   }
 
-  const isLastStep = step === TOTAL_STEPS;
+  const totalSteps = editing ? TOTAL_STEPS_EDIT : TOTAL_STEPS_NEW;
+  const isLastStep = step === totalSteps;
   const isSkippable = step === 3;
 
   return (
@@ -289,7 +304,12 @@ export default function OnboardingScreen({ route, navigation }) {
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 44 }]}
         keyboardShouldPersistTaps="handled"
       >
-        {!editing && (
+        {editing && (
+          <TouchableOpacity style={[styles.closeButton, { top: 16 }]} onPress={() => navigation.goBack()}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      {!editing && (
           <Text style={styles.welcomeLabel}>Sett opp profil</Text>
         )}
         {renderProgressDots()}
@@ -331,6 +351,35 @@ export default function OnboardingScreen({ route, navigation }) {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowDatePicker(false)}
+        />
+        <View style={styles.pickerModal}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>Fødselsdato</Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <Text style={styles.pickerDone}>Ferdig</Text>
+            </TouchableOpacity>
+          </View>
+          <DateTimePicker
+            value={birthDate ?? MAX_BIRTH_DATE}
+            mode="date"
+            display="spinner"
+            onChange={(_, date) => { if (date) setBirthDate(date); }}
+            maximumDate={new Date()}
+            textColor="#000000"
+          />
+        </View>
       </Modal>
 
       <View style={[styles.footer, { marginBottom: keyboardHeight > 0 ? keyboardHeight + 16 : insets.bottom }]}>
@@ -552,6 +601,60 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#fff',
     fontWeight: '600',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 14,
+    backgroundColor: '#f9f9f9',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#111',
+  },
+  dateButtonPlaceholder: {
+    fontSize: 16,
+    color: '#aaa',
+  },
+  ageError: {
+    color: '#e53935',
+    fontSize: 13,
+    marginTop: 8,
+  },
+  pickerModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 32,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111',
+  },
+  pickerDone: {
+    fontSize: 16,
+    color: '#1a73e8',
+    fontWeight: '600',
+  },
+  closeButton: {
+    position: 'absolute',
+    left: 24,
+    zIndex: 10,
+    padding: 4,
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: '#666',
   },
   footer: {
     flexDirection: 'row',

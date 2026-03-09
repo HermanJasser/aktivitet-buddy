@@ -16,6 +16,15 @@ export default function ProfileScreen({ navigation }) {
     ]);
   }
 
+  const age = profile?.birth_date ? (() => {
+    const today = new Date();
+    const dob = new Date(profile.birth_date);
+    let a = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) a--;
+    return a;
+  })() : null;
+
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : session?.user?.email?.[0]?.toUpperCase() ?? '?';
@@ -36,13 +45,6 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.bio}>{profile.bio}</Text>
       ) : null}
 
-      <View style={styles.metaRow}>
-        {profile?.age ? (
-          <View style={styles.metaChip}>
-            <Text style={styles.metaChipText}>{profile.age} år</Text>
-          </View>
-        ) : null}
-      </View>
 
       {profile?.preferred_activities?.length > 0 && (
         <View style={styles.section}>
