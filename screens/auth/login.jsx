@@ -32,12 +32,19 @@ export default function LoginScreen({ navigation }) {
     setGoogleLoading(true);
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'aktivitet-buddy', path: 'auth/callback' });
+      console.log('Redirect URL:', redirectUrl);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
       });
+      console.log('OAuth data:', JSON.stringify(data));
+      console.log('OAuth error:', JSON.stringify(error));
       if (error) throw error;
-      if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (data?.url) {
+        console.log('Opening URL:', data.url);
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        console.log('Browser result:', JSON.stringify(result));
+      }
     } catch (e) {
       Alert.alert('Google-innlogging feilet', e.message);
     } finally {

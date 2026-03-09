@@ -38,7 +38,8 @@ export default function MapScreen({ navigation }) {
       .from('activities')
       .select('*')
       .not('latitude', 'is', null)
-      .not('longitude', 'is', null);
+      .not('longitude', 'is', null)
+      .gte('scheduled_at', new Date().toISOString());
     if (data) setActivities(data);
   }
 

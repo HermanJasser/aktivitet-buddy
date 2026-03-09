@@ -30,8 +30,10 @@ const ACTIVITIES = [
   'Squash', 'Bordtennis', 'Løping', 'Sykling', 'Svømming', 'Trening',
   'Klatring', 'Fjelltur', 'Slalom', 'Randone', 'Skating', 'Skøyting', 'Fisking',
 ];
-const TOTAL_STEPS_NEW = 5;
-const TOTAL_STEPS_EDIT = 4;
+const FIRST_STEP_NEW = 1;
+const FIRST_STEP_EDIT = 2;
+const LAST_STEP_NEW = 5;
+const LAST_STEP_EDIT = 4;
 
 export default function OnboardingScreen({ route, navigation }) {
   const editing = route?.params?.editing ?? false;
@@ -39,7 +41,9 @@ export default function OnboardingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const userId = session?.user?.id;
 
-  const [step, setStep] = useState(1);
+  const firstStep = editing ? FIRST_STEP_EDIT : FIRST_STEP_NEW;
+  const lastStep = editing ? LAST_STEP_EDIT : LAST_STEP_NEW;
+  const [step, setStep] = useState(firstStep);
   const [fullName, setFullName] = useState('');
   const [avatarUri, setAvatarUri] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -179,7 +183,7 @@ export default function OnboardingScreen({ route, navigation }) {
         {Array.from({ length: totalSteps }).map((_, i) => (
           <View
             key={i}
-            style={[styles.dot, i + 1 === step && styles.dotActive, i + 1 < step && styles.dotDone]}
+            style={[styles.dot, i === step - firstStep && styles.dotActive, i < step - firstStep && styles.dotDone]}
           />
         ))}
       </View>
@@ -294,8 +298,8 @@ export default function OnboardingScreen({ route, navigation }) {
     }
   }
 
-  const totalSteps = editing ? TOTAL_STEPS_EDIT : TOTAL_STEPS_NEW;
-  const isLastStep = step === totalSteps;
+  const totalSteps = lastStep - firstStep + 1;
+  const isLastStep = step === lastStep;
   const isSkippable = step === 3;
 
   return (
@@ -383,7 +387,7 @@ export default function OnboardingScreen({ route, navigation }) {
       </Modal>
 
       <View style={[styles.footer, { marginBottom: keyboardHeight > 0 ? keyboardHeight + 16 : insets.bottom }]}>
-        {step > 1 && (
+        {step > firstStep && (
           <TouchableOpacity style={styles.backButton} onPress={() => setStep(s => s - 1)}>
             <Text style={styles.backButtonText}>Tilbake</Text>
           </TouchableOpacity>

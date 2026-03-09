@@ -15,7 +15,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 
-const ACTIVITY_TYPES = ['Fotball', 'Løping', 'Sykling', 'Tennis', 'Annet'];
+const ACTIVITY_TYPES = [
+  'Fotball', 'Basket', 'Håndball', 'Volleyball', 'Tennis', 'Padel',
+  'Squash', 'Bordtennis', 'Løping', 'Sykling', 'Svømming', 'Trening',
+  'Klatring', 'Fjelltur', 'Slalom', 'Randone', 'Skating', 'Skøyting', 'Fisking',
+];
 
 const OSLO_REGION = {
   latitude: 59.9139,
@@ -27,23 +31,40 @@ const OSLO_REGION = {
 export default function CreateActivity({ navigation }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState(null);
+  const [customType, setCustomType] = useState('');
+  const [showCustomTypeModal, setShowCustomTypeModal] = useState(false);
   const [description, setDescription] = useState('');
   const [scheduledAt, setScheduledAt] = useState(new Date());
   const [pickerMode, setPickerMode] = useState(null); // null | 'date' | 'time'
   const [location, setLocation] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  async function useMyLocation() {
+  async function fetchUserLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
+    if (status !== 'granted') return null;
+    const loc = await Location.getCurrentPositionAsync({});
+    return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+  }
+
+  async function useMyLocation() {
+    const coords = await fetchUserLocation();
+    if (!coords) {
       Alert.alert('Tilgang nektet', 'Gi tilgang til posisjon i innstillinger.');
       return;
     }
-    const loc = await Location.getCurrentPositionAsync({});
-    setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+    setLocation(coords);
     setShowMap(false);
     Alert.alert('Posisjon hentet', 'Din nåværende posisjon er valgt.');
+  }
+
+  async function handleShowMap() {
+    if (!userLocation) {
+      const coords = await fetchUserLocation();
+      if (coords) setUserLocation(coords);
+    }
+    setShowMap(true);
   }
 
   function onMapPress(e) {
@@ -128,7 +149,64 @@ export default function CreateActivity({ navigation }) {
             </Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={[styles.typeChip, type && !ACTIVITY_TYPES.includes(type) && styles.typeChipActive]}
+          onPress={() => setShowCustomTypeModal(true)}
+        >
+          <Text style={[styles.typeChipText, type && !ACTIVITY_TYPES.includes(type) && styles.typeChipTextActive]}>
+            {type && !ACTIVITY_TYPES.includes(type) ? type : 'Annet'}
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showCustomTypeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCustomTypeModal(false)}
+      >
+        <View style={styles.customTypeOverlay}>
+          <View style={styles.customTypeBox}>
+            <Text style={styles.customTypeTitle}>Skriv inn aktivitetstype</Text>
+            <TextInput
+              style={styles.customTypeInput}
+              placeholder="F.eks. Padletur, Dans, Yoga..."
+              value={customType}
+              onChangeText={setCustomType}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (customType.trim()) {
+                  setType(customType.trim());
+                  setShowCustomTypeModal(false);
+                  setCustomType('');
+                }
+              }}
+            />
+            <View style={styles.customTypeButtons}>
+              <TouchableOpacity
+                style={styles.customTypeCancelBtn}
+                onPress={() => { setShowCustomTypeModal(false); setCustomType(''); }}
+              >
+                <Text style={styles.customTypeCancelText}>Avbryt</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customTypeConfirmBtn, !customType.trim() && { backgroundColor: '#aaa' }]}
+                onPress={() => {
+                  if (customType.trim()) {
+                    setType(customType.trim());
+                    setShowCustomTypeModal(false);
+                    setCustomType('');
+                  }
+                }}
+                disabled={!customType.trim()}
+              >
+                <Text style={styles.customTypeConfirmText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Text style={styles.label}>Beskrivelse</Text>
       <TextInput
@@ -192,7 +270,7 @@ export default function CreateActivity({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.locationButton, showMap && styles.locationButtonActive]}
-          onPress={() => setShowMap(!showMap)}
+          onPress={() => { if (showMap) setShowMap(false); else handleShowMap(); }}
         >
           <Text style={[styles.locationButtonText, showMap && styles.locationButtonTextActive]}>
             Velg på kart
@@ -214,6 +292,10 @@ export default function CreateActivity({ navigation }) {
             provider={PROVIDER_DEFAULT}
             initialRegion={location ? {
               ...location,
+              latitudeDelta: 0.04,
+              longitudeDelta: 0.04,
+            } : userLocation ? {
+              ...userLocation,
               latitudeDelta: 0.04,
               longitudeDelta: 0.04,
             } : OSLO_REGION}
@@ -411,5 +493,60 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: '100%',
+  },
+  customTypeOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  customTypeBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+  },
+  customTypeTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  customTypeInput: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginBottom: 16,
+  },
+  customTypeButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  customTypeCancelBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    alignItems: 'center',
+  },
+  customTypeCancelText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  customTypeConfirmBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#1a73e8',
+    alignItems: 'center',
+  },
+  customTypeConfirmText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });

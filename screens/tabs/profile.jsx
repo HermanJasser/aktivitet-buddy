@@ -1,29 +1,38 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import ActivityCard from '../../components/ActivityCard';
 
 export default function ProfileScreen({ navigation }) {
   const { session, profile } = useAuth();
+  const [activities, setActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (session?.user?.id) fetchMyActivities();
+    }, [session?.user?.id])
+  );
+
+  async function fetchMyActivities() {
+    setLoadingActivities(true);
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('scheduled_at', { ascending: false });
+    if (!error && data) setActivities(data);
+    setLoadingActivities(false);
+  }
 
   async function handleLogout() {
     Alert.alert('Logg ut', 'Er du sikker på at du vil logge ut?', [
       { text: 'Avbryt', style: 'cancel' },
-      {
-        text: 'Logg ut',
-        style: 'destructive',
-        onPress: () => supabase.auth.signOut(),
-      },
+      { text: 'Logg ut', style: 'destructive', onPress: () => supabase.auth.signOut() },
     ]);
   }
-
-  const age = profile?.birth_date ? (() => {
-    const today = new Date();
-    const dob = new Date(profile.birth_date);
-    let a = today.getFullYear() - dob.getFullYear();
-    const m = today.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) a--;
-    return a;
-  })() : null;
 
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -41,10 +50,7 @@ export default function ProfileScreen({ navigation }) {
 
       <Text style={styles.name}>{profile?.full_name ?? session?.user?.email ?? '—'}</Text>
 
-      {profile?.bio ? (
-        <Text style={styles.bio}>{profile.bio}</Text>
-      ) : null}
-
+      {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
 
       {profile?.preferred_activities?.length > 0 && (
         <View style={styles.section}>
@@ -58,6 +64,19 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Mine aktiviteter</Text>
+        {loadingActivities ? (
+          <ActivityIndicator color="#1a73e8" style={{ marginTop: 8 }} />
+        ) : activities.length === 0 ? (
+          <Text style={styles.emptyText}>Du har ikke lagt ut noen aktiviteter enda.</Text>
+        ) : (
+          activities.map(activity => (
+            <ActivityCard key={activity.id} activity={activity} />
+          ))
+        )}
+      </View>
 
       <TouchableOpacity
         style={styles.editButton}
@@ -119,22 +138,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 8,
   },
-  metaRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 24,
-  },
-  metaChip: {
-    backgroundColor: '#e8f0fe',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  metaChipText: {
-    color: '#1a73e8',
-    fontSize: 13,
-    fontWeight: '500',
-  },
   section: {
     width: '100%',
     marginBottom: 24,
@@ -162,6 +165,12 @@ const styles = StyleSheet.create({
     color: '#1a73e8',
     fontSize: 13,
     fontWeight: '500',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#aaa',
+    textAlign: 'center',
+    paddingVertical: 8,
   },
   editButton: {
     width: '100%',
