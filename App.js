@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, ActivityIndicator, View, StyleSheet } from 'react-native';
 
-import { useAuth } from './hooks/useAuth';
+import { useAuth, AuthProvider } from './hooks/useAuth';
 import LoginScreen from './screens/auth/login';
 import RegisterScreen from './screens/auth/register';
 import MapScreen from './screens/tabs/map';
@@ -12,6 +12,7 @@ import ActivitiesScreen from './screens/tabs/activities';
 import ProfileScreen from './screens/tabs/profile';
 import CreateActivity from './screens/CreateActivity';
 import UserProfile from './screens/UserProfile';
+import OnboardingScreen from './screens/Onboarding';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -46,6 +47,14 @@ function AuthStack() {
   );
 }
 
+function OnboardingStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function MainStack() {
   return (
     <Stack.Navigator>
@@ -69,12 +78,20 @@ function MainStack() {
           headerTintColor: '#1a73e8',
         }}
       />
+      <Stack.Screen
+        name="Onboarding"
+        component={OnboardingScreen}
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
+      />
     </Stack.Navigator>
   );
 }
 
-export default function App() {
-  const { session, loading } = useAuth();
+function RootNavigator() {
+  const { session, loading, profileComplete } = useAuth();
 
   if (loading) {
     return (
@@ -86,8 +103,22 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      {session ? <MainStack /> : <AuthStack />}
+      {!session ? (
+        <AuthStack />
+      ) : !profileComplete ? (
+        <OnboardingStack />
+      ) : (
+        <MainStack />
+      )}
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }
 

@@ -2,6 +2,7 @@
   "expo": {
     "name": "aktivitet-buddy",
     "slug": "aktivitet-buddy",
+    "scheme": "aktivitet-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -31,7 +32,9 @@
     },
     "plugins": [
       "expo-asset",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser",
+      "expo-image-picker"
     ]
   }
 }

@@ -1,0 +1,601 @@
+import { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Image,
+  ScrollView,
+  Modal,
+  Keyboard,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+
+const ACTIVITIES = [
+  'Fotball', 'Basket', 'Håndball', 'Volleyball', 'Tennis', 'Padel',
+  'Squash', 'Bordtennis', 'Løping', 'Sykling', 'Svømming', 'Trening',
+  'Klatring', 'Fjelltur', 'Slalom', 'Randone', 'Skating', 'Skøyting', 'Fisking',
+];
+const TOTAL_STEPS = 5;
+
+export default function OnboardingScreen({ route, navigation }) {
+  const editing = route?.params?.editing ?? false;
+  const { session, profile, refreshProfile } = useAuth();
+  const insets = useSafeAreaInsets();
+  const userId = session?.user?.id;
+
+  const [step, setStep] = useState(1);
+  const [fullName, setFullName] = useState('');
+  const [avatarUri, setAvatarUri] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [bio, setBio] = useState('');
+  const [selectedActivities, setSelectedActivities] = useState([]);
+  const [age, setAge] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0)
+    );
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (editing && profile) {
+      setFullName(profile.full_name ?? '');
+      setBio(profile.bio ?? '');
+      setSelectedActivities(profile.preferred_activities ?? []);
+      setAge(profile.age ? String(profile.age) : '');
+      setAvatarUrl(profile.avatar_url ?? null);
+    }
+  }, [editing, profile]);
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Tillatelse nødvendig', 'Vi trenger tilgang til bildebiblioteket ditt.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  }
+
+  async function uploadAvatar() {
+    if (!avatarUri) return avatarUrl;
+    setUploading(true);
+    try {
+      const response = await fetch(avatarUri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Response(blob).arrayBuffer();
+      const filePath = `${userId}/avatar.jpg`;
+      const { error } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, arrayBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+      if (error) throw error;
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (e) {
+      Alert.alert('Opplastingsfeil', e.message);
+      return avatarUrl;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!fullName.trim()) {
+      Alert.alert('Mangler navn', 'Du må fylle inn fullt navn.');
+      setStep(1);
+      return;
+    }
+    setSaving(true);
+    try {
+      const uploadedUrl = await uploadAvatar();
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId,
+        full_name: fullName.trim(),
+        bio: bio.trim() || null,
+        preferred_activities: selectedActivities,
+        age: age ? parseInt(age, 10) : null,
+        avatar_url: uploadedUrl ?? null,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      await refreshProfile();
+      if (editing) navigation.goBack();
+    } catch (e) {
+      Alert.alert('Lagringsfeil', e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleActivity(activity) {
+    setSelectedActivities(prev =>
+      prev.includes(activity) ? prev.filter(a => a !== activity) : [...prev, activity]
+    );
+  }
+
+  function addCustomActivity() {
+    const trimmed = customText.trim();
+    if (!trimmed) return;
+    if (!selectedActivities.includes(trimmed)) {
+      setSelectedActivities(prev => [...prev, trimmed]);
+    }
+    setCustomText('');
+    setShowCustomInput(false);
+  }
+
+  const customActivities = selectedActivities.filter(a => !ACTIVITIES.includes(a));
+
+  function canProceed() {
+    if (step === 1) return fullName.trim().length > 0;
+    return true;
+  }
+
+  function renderProgressDots() {
+    return (
+      <View style={styles.dots}>
+        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          <View
+            key={i}
+            style={[styles.dot, i + 1 === step && styles.dotActive, i + 1 < step && styles.dotDone]}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  function renderStep() {
+    switch (step) {
+      case 1:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Hva heter du?</Text>
+            <Text style={styles.stepSubtitle}>Andre vil se dette på profilen din</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Fullt navn"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              autoFocus
+            />
+          </View>
+        );
+      case 2:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Legg til profilbilde</Text>
+            <Text style={styles.stepSubtitle}>Velg et bilde fra galleriet ditt</Text>
+            <TouchableOpacity style={styles.avatarPicker} onPress={pickImage}>
+              {avatarUri || avatarUrl ? (
+                <Image
+                  source={{ uri: avatarUri ?? avatarUrl }}
+                  style={styles.avatarPreview}
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarPlaceholderText}>📷</Text>
+                  <Text style={styles.avatarPlaceholderLabel}>Velg bilde</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {uploading && <ActivityIndicator color="#1a73e8" style={{ marginTop: 12 }} />}
+          </View>
+        );
+      case 3:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Fortell litt om deg selv</Text>
+            <Text style={styles.stepSubtitle}>Bio vises på profilen din</Text>
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              placeholder="Skriv en kort bio... (valgfritt)"
+              value={bio}
+              onChangeText={setBio}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        );
+      case 4:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Favorittaktiviteter</Text>
+            <Text style={styles.stepSubtitle}>Velg hva du liker å gjøre</Text>
+            <View style={styles.chips}>
+              {ACTIVITIES.map(activity => (
+                <TouchableOpacity
+                  key={activity}
+                  style={[styles.chip, selectedActivities.includes(activity) && styles.chipSelected]}
+                  onPress={() => toggleActivity(activity)}
+                >
+                  <Text style={[styles.chipText, selectedActivities.includes(activity) && styles.chipTextSelected]}>
+                    {activity}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {customActivities.map(activity => (
+                <TouchableOpacity
+                  key={activity}
+                  style={[styles.chip, styles.chipSelected]}
+                  onPress={() => setSelectedActivities(prev => prev.filter(a => a !== activity))}
+                >
+                  <Text style={[styles.chipText, styles.chipTextSelected]}>{activity} ×</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.chip, showCustomInput && styles.chipSelected]}
+                onPress={() => setShowCustomInput(v => !v)}
+              >
+                <Text style={[styles.chipText, showCustomInput && styles.chipTextSelected]}>
+                  + Annet
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      case 5:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={styles.stepTitle}>Hvor gammel er du?</Text>
+            <Text style={styles.stepSubtitle}>Alder vises på profilen din (valgfritt)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Alder"
+              value={age}
+              onChangeText={setAge}
+              keyboardType="number-pad"
+              autoFocus
+            />
+          </View>
+        );
+    }
+  }
+
+  const isLastStep = step === TOTAL_STEPS;
+  const isSkippable = step === 3;
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 44 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {!editing && (
+          <Text style={styles.welcomeLabel}>Sett opp profil</Text>
+        )}
+        {renderProgressDots()}
+        {renderStep()}
+      </ScrollView>
+
+      <Modal
+        visible={showCustomInput}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCustomInput(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowCustomInput(false)}
+        >
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Legg til aktivitet</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Skriv aktivitet..."
+              value={customText}
+              onChangeText={setCustomText}
+              onSubmitEditing={addCustomActivity}
+              returnKeyType="done"
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => { setShowCustomInput(false); setCustomText(''); }}
+              >
+                <Text style={styles.modalCancelText}>Avbryt</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={addCustomActivity}>
+                <Text style={styles.modalConfirmText}>Legg til</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <View style={[styles.footer, { marginBottom: keyboardHeight > 0 ? keyboardHeight + 16 : insets.bottom }]}>
+        {step > 1 && (
+          <TouchableOpacity style={styles.backButton} onPress={() => setStep(s => s - 1)}>
+            <Text style={styles.backButtonText}>Tilbake</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.footerRight}>
+          {isSkippable && (
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={() => setStep(s => s + 1)}
+            >
+              <Text style={styles.skipButtonText}>Hopp over</Text>
+            </TouchableOpacity>
+          )}
+
+          {isLastStep ? (
+            <TouchableOpacity
+              style={[styles.primaryButton, (saving || !canProceed()) && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  {editing ? 'Lagre endringer' : 'Fullfør'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.primaryButton, !canProceed() && styles.buttonDisabled]}
+              onPress={() => setStep(s => s + 1)}
+              disabled={!canProceed()}
+            >
+              <Text style={styles.primaryButtonText}>Neste</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scroll: {
+    flexGrow: 1,
+    padding: 24,
+    paddingTop: 0,
+    paddingBottom: 16,
+  },
+  welcomeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 40,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e0e0e0',
+  },
+  dotActive: {
+    backgroundColor: '#1a73e8',
+    width: 24,
+  },
+  dotDone: {
+    backgroundColor: '#4caf50',
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#111',
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 28,
+  },
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  bioInput: {
+    height: 120,
+    paddingTop: 14,
+  },
+  avatarPicker: {
+    alignSelf: 'center',
+  },
+  avatarPreview: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
+    borderColor: '#1a73e8',
+  },
+  avatarPlaceholder: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#f0f4ff',
+    borderWidth: 2,
+    borderColor: '#1a73e8',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPlaceholderText: {
+    fontSize: 36,
+  },
+  avatarPlaceholderLabel: {
+    fontSize: 13,
+    color: '#1a73e8',
+    marginTop: 6,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+    backgroundColor: '#f9f9f9',
+  },
+  chipSelected: {
+    backgroundColor: '#1a73e8',
+    borderColor: '#1a73e8',
+  },
+  chipText: {
+    fontSize: 14,
+    color: '#555',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#fff',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  modalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111',
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalCancel: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    color: '#666',
+  },
+  modalConfirm: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 10,
+    backgroundColor: '#1a73e8',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  footerRight: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  backButton: {
+    padding: 14,
+  },
+  backButtonText: {
+    fontSize: 15,
+    color: '#666',
+  },
+  skipButton: {
+    padding: 14,
+  },
+  skipButtonText: {
+    fontSize: 15,
+    color: '#1a73e8',
+  },
+  primaryButton: {
+    backgroundColor: '#1a73e8',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

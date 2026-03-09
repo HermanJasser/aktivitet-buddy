@@ -9,12 +9,17 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../../lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleRegister() {
     setLoading(true);
@@ -29,6 +34,23 @@ export default function RegisterScreen({ navigation }) {
       );
     }
     setLoading(false);
+  }
+
+  async function handleGoogleLogin() {
+    setGoogleLoading(true);
+    try {
+      const redirectUrl = makeRedirectUri({ scheme: 'aktivitet-buddy', path: 'auth/callback' });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
+      });
+      if (error) throw error;
+      if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+    } catch (e) {
+      Alert.alert('Google-innlogging feilet', e.message);
+    } finally {
+      setGoogleLoading(false);
+    }
   }
 
   return (
@@ -63,6 +85,22 @@ export default function RegisterScreen({ navigation }) {
         disabled={loading}
       >
         <Text style={styles.buttonText}>{loading ? 'Registrerer...' : 'Registrer deg'}</Text>
+      </TouchableOpacity>
+
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>eller</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+        onPress={handleGoogleLogin}
+        disabled={googleLoading}
+      >
+        <Text style={styles.googleButtonText}>
+          {googleLoading ? 'Åpner Google...' : 'Fortsett med Google'}
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
@@ -116,6 +154,37 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    fontSize: 13,
+    color: '#999',
+    marginHorizontal: 12,
+  },
+  googleButton: {
+    width: '100%',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+  },
+  googleButtonText: {
+    color: '#333',
     fontSize: 16,
     fontWeight: '600',
   },
