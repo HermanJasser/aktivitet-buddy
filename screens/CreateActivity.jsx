@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -37,6 +38,8 @@ export default function CreateActivity({ navigation }) {
   const [scheduledAt, setScheduledAt] = useState(new Date());
   const [pickerMode, setPickerMode] = useState(null); // null | 'date' | 'time'
   const [location, setLocation] = useState(null);
+  const [addressQuery, setAddressQuery] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -65,6 +68,25 @@ export default function CreateActivity({ navigation }) {
       if (coords) setUserLocation(coords);
     }
     setShowMap(true);
+  }
+
+  async function geocodeAddress() {
+    if (!addressQuery.trim()) return;
+    setGeocoding(true);
+    try {
+      const results = await Location.geocodeAsync(addressQuery.trim());
+      if (results.length === 0) {
+        Alert.alert('Ikke funnet', 'Fant ingen resultater for adressen. Prøv å være mer spesifikk.');
+      } else {
+        const { latitude, longitude } = results[0];
+        setLocation({ latitude, longitude });
+        setShowMap(false);
+      }
+    } catch {
+      Alert.alert('Feil', 'Kunne ikke søke etter adressen. Sjekk internettforbindelsen.');
+    } finally {
+      setGeocoding(false);
+    }
   }
 
   function onMapPress(e) {
@@ -278,6 +300,27 @@ export default function CreateActivity({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.addressRow}>
+        <TextInput
+          style={styles.addressInput}
+          placeholder="Søk på adresse..."
+          value={addressQuery}
+          onChangeText={setAddressQuery}
+          returnKeyType="search"
+          onSubmitEditing={geocodeAddress}
+        />
+        <TouchableOpacity
+          style={[styles.addressSearchBtn, geocoding && { backgroundColor: '#aaa' }]}
+          onPress={geocodeAddress}
+          disabled={geocoding}
+        >
+          {geocoding
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={styles.addressSearchText}>Søk</Text>
+          }
+        </TouchableOpacity>
+      </View>
+
       {location && !showMap && (
         <Text style={styles.locationInfo}>
           Posisjon valgt: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
@@ -395,6 +438,32 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  addressInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  addressSearchBtn: {
+    backgroundColor: '#1a73e8',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addressSearchText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
   },
   locationButton: {
     flex: 1,
