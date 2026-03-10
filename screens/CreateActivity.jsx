@@ -149,6 +149,7 @@ export default function CreateActivity({ navigation }) {
       style={styles.container}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
     >
       <Text style={styles.label}>Tittel *</Text>
       <TextInput
