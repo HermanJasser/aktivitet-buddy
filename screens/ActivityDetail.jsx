@@ -1,5 +1,7 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
+import { supabase } from '../lib/supabase';
 
 const ACTIVITY_COLORS = {
   fotball: '#4caf50',
@@ -12,6 +14,18 @@ const ACTIVITY_COLORS = {
 export default function ActivityDetail({ route, navigation }) {
   const { activity } = route.params;
   const color = ACTIVITY_COLORS[activity.type?.toLowerCase()] ?? ACTIVITY_COLORS.default;
+  const [organizer, setOrganizer] = useState(null);
+
+  useEffect(() => {
+    if (activity.user_id) {
+      supabase
+        .from('profiles')
+        .select('full_name, username, avatar_url')
+        .eq('id', activity.user_id)
+        .single()
+        .then(({ data }) => { if (data) setOrganizer(data); });
+    }
+  }, [activity.user_id]);
 
   const scheduledDate = new Date(activity.scheduled_at);
   const formattedDate = scheduledDate.toLocaleDateString('nb-NO', {
@@ -24,6 +38,9 @@ export default function ActivityDetail({ route, navigation }) {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const displayName = organizer?.full_name || organizer?.username || 'Ukjent';
+  const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -70,10 +87,22 @@ export default function ActivityDetail({ route, navigation }) {
 
       {activity.user_id ? (
         <TouchableOpacity
-          style={styles.profileButton}
+          style={styles.organizerRow}
           onPress={() => navigation.navigate('UserProfile', { userId: activity.user_id })}
+          activeOpacity={0.7}
         >
-          <Text style={styles.profileButtonText}>Se arrangørens profil</Text>
+          {organizer?.avatar_url ? (
+            <Image source={{ uri: organizer.avatar_url }} style={styles.organizerAvatar} />
+          ) : (
+            <View style={styles.organizerAvatarFallback}>
+              <Text style={styles.organizerInitials}>{initials || '?'}</Text>
+            </View>
+          )}
+          <View style={styles.organizerInfo}>
+            <Text style={styles.organizerLabel}>Arrangør</Text>
+            <Text style={styles.organizerName}>{displayName}</Text>
+          </View>
+          <Text style={styles.organizerChevron}>›</Text>
         </TouchableOpacity>
       ) : null}
     </ScrollView>
@@ -146,18 +175,56 @@ const styles = StyleSheet.create({
   map: {
     height: 180,
   },
-  profileButton: {
-    marginTop: 4,
-    padding: 16,
+  organizerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#1a73e8',
+    padding: 14,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  profileButtonText: {
-    color: '#1a73e8',
+  organizerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  organizerAvatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1a73e8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  organizerInitials: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  organizerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  organizerLabel: {
+    fontSize: 11,
+    color: '#999',
     fontWeight: '600',
-    fontSize: 15,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  organizerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginTop: 2,
+  },
+  organizerChevron: {
+    fontSize: 24,
+    color: '#ccc',
   },
 });
