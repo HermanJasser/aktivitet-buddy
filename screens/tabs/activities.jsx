@@ -105,7 +105,7 @@ export default function ActivitiesScreen({ navigation }) {
                 <ActivityPin
                   key={activity.id}
                   activity={activity}
-                  onProfilePress={(userId) => navigation.navigate('UserProfile', { userId })}
+                  onActivityPress={(a) => navigation.navigate('ActivityDetail', { activity: a })}
                 />
               ))}
             </MapView>

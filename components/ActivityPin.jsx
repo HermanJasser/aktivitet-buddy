@@ -9,7 +9,7 @@ const ACTIVITY_COLORS = {
   default: '#1a73e8',
 };
 
-export default function ActivityPin({ activity, onProfilePress }) {
+export default function ActivityPin({ activity, onActivityPress }) {
   const color = ACTIVITY_COLORS[activity.type?.toLowerCase()] ?? ACTIVITY_COLORS.default;
 
   const formattedTime = activity.scheduled_at
@@ -31,16 +31,14 @@ export default function ActivityPin({ activity, onProfilePress }) {
       <View style={[styles.pin, { backgroundColor: color }]}>
         <Text style={styles.pinText}>{activity.type?.[0]?.toUpperCase() ?? '?'}</Text>
       </View>
-      <Callout onPress={() => onProfilePress && onProfilePress(activity.user_id)}>
+      <Callout onPress={() => onActivityPress && onActivityPress(activity)}>
         <View style={styles.callout}>
           <Text style={styles.calloutTitle}>{activity.title}</Text>
           <Text style={styles.calloutSub}>{activity.type}</Text>
           {formattedTime ? <Text style={styles.calloutTime}>{formattedTime}</Text> : null}
-          {onProfilePress ? (
-            <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileButtonText}>Se profil</Text>
-            </TouchableOpacity>
-          ) : null}
+          <View style={styles.openButton}>
+            <Text style={styles.openButtonText}>Se mer →</Text>
+          </View>
         </View>
       </Callout>
     </Marker>
@@ -87,15 +85,12 @@ const styles = StyleSheet.create({
     color: '#999',
     marginBottom: 6,
   },
-  profileButton: {
-    backgroundColor: '#1a73e8',
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+  openButton: {
+    marginTop: 6,
     alignSelf: 'flex-start',
   },
-  profileButtonText: {
-    color: '#fff',
+  openButtonText: {
+    color: '#1a73e8',
     fontSize: 12,
     fontWeight: '600',
   },
