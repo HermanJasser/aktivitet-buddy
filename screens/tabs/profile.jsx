@@ -73,7 +73,11 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.emptyText}>Du har ikke lagt ut noen aktiviteter enda.</Text>
         ) : (
           activities.map(activity => (
-            <ActivityCard key={activity.id} activity={activity} />
+            <ActivityCard
+              key={activity.id}
+              activity={activity}
+              onPress={() => navigation.navigate('ActivityDetail', { activity })}
+            />
           ))
         )}
       </View>

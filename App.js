@@ -11,6 +11,7 @@ import MapScreen from './screens/tabs/map';
 import ActivitiesScreen from './screens/tabs/activities';
 import ProfileScreen from './screens/tabs/profile';
 import CreateActivity from './screens/CreateActivity';
+import ActivityDetail from './screens/ActivityDetail';
 import UserProfile from './screens/UserProfile';
 import OnboardingScreen from './screens/Onboarding';
 
@@ -96,6 +97,15 @@ function MainStack() {
         options={{
           title: 'Ny aktivitet',
           presentation: 'modal',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#1a73e8',
+        }}
+      />
+      <Stack.Screen
+        name="ActivityDetail"
+        component={ActivityDetail}
+        options={{
+          title: 'Aktivitet',
           headerStyle: { backgroundColor: '#fff' },
           headerTintColor: '#1a73e8',
         }}

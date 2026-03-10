@@ -120,7 +120,12 @@ export default function ActivitiesScreen({ navigation }) {
           <FlatList
             data={activities}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <ActivityCard activity={item} />}
+            renderItem={({ item }) => (
+              <ActivityCard
+                activity={item}
+                onPress={() => navigation.navigate('ActivityDetail', { activity: item })}
+              />
+            )}
             contentContainerStyle={activities.length === 0 ? styles.emptyContainer : { paddingVertical: 8 }}
             ListEmptyComponent={
               <View style={styles.empty}>
