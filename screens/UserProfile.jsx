@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   FlatList,
   StyleSheet,
   ActivityIndicator,
@@ -58,9 +59,13 @@ export default function UserProfile({ route }) {
       renderItem={({ item }) => <ActivityCard activity={item} />}
       ListHeaderComponent={
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials || '?'}</Text>
-          </View>
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials || '?'}</Text>
+            </View>
+          )}
           <Text style={styles.name}>{displayName}</Text>
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           <Text style={styles.sectionTitle}>Aktiviteter</Text>
@@ -88,6 +93,12 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#fff',
     marginBottom: 8,
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginBottom: 12,
   },
   avatar: {
     width: 72,
