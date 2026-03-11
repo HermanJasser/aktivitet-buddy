@@ -55,7 +55,7 @@ export default function MapScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#7C5CBF" />
         <Text style={styles.loadingText}>Henter posisjon...</Text>
       </View>
     );

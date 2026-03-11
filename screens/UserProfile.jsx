@@ -38,7 +38,7 @@ export default function UserProfile({ route }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#7C5CBF" />
       </View>
     );
   }
@@ -81,7 +81,7 @@ export default function UserProfile({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   center: {
     flex: 1,
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#1A1A2E',
     marginBottom: 4,
   },
   bio: {

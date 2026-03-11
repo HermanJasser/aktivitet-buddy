@@ -34,7 +34,12 @@
       "expo-asset",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
-      "expo-image-picker"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "aktivitet-buddy trenger tilgang til bilder for å legge til bilder på aktiviteter."
+        }
+      ]
     ]
   }
 }

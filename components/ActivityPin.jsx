@@ -1,97 +1,56 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Marker, Callout } from 'react-native-maps';
+import { View, Text, StyleSheet } from 'react-native';
+import { Marker } from 'react-native-maps';
 
 const ACTIVITY_COLORS = {
   fotball: '#4caf50',
   løping: '#ff9800',
-  sykling: '#2196f3',
+  sykling: '#00897B',
   tennis: '#9c27b0',
-  default: '#1a73e8',
+  default: '#7C5CBF',
+};
+
+const ACTIVITY_ICONS = {
+  fotball: '⚽', basket: '🏀', håndball: '🤾', volleyball: '🏐',
+  tennis: '🎾', padel: '🏓', squash: '🎾', bordtennis: '🏓',
+  løping: '🏃', sykling: '🚴', svømming: '🏊', trening: '💪',
+  klatring: '🧗', fjelltur: '🥾', slalom: '⛷️', randone: '🎿',
+  skating: '🛹', skøyting: '⛸️', fisking: '🎣',
 };
 
 export default function ActivityPin({ activity, onActivityPress }) {
   const color = ACTIVITY_COLORS[activity.type?.toLowerCase()] ?? ACTIVITY_COLORS.default;
-
-  const formattedTime = activity.scheduled_at
-    ? new Date(activity.scheduled_at).toLocaleString('nb-NO', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
+  const icon = ACTIVITY_ICONS[activity.type?.toLowerCase()] ?? '🏅';
 
   return (
     <Marker
-      coordinate={{
-        latitude: activity.latitude,
-        longitude: activity.longitude,
-      }}
+      coordinate={{ latitude: activity.latitude, longitude: activity.longitude }}
+      tracksViewChanges={false}
+      onPress={() => onActivityPress && onActivityPress(activity)}
+      onSelect={() => onActivityPress && onActivityPress(activity)}
     >
-      <View style={[styles.pin, { backgroundColor: color }]}>
-        <Text style={styles.pinText}>{activity.type?.[0]?.toUpperCase() ?? '?'}</Text>
+      <View style={[styles.pin, { backgroundColor: color }]} pointerEvents="none">
+        <Text style={styles.icon}>{icon}</Text>
       </View>
-      <Callout onPress={() => onActivityPress && onActivityPress(activity)}>
-        <View style={styles.callout}>
-          <Text style={styles.calloutTitle}>{activity.title}</Text>
-          <Text style={styles.calloutSub}>{activity.type}</Text>
-          {formattedTime ? <Text style={styles.calloutTime}>{formattedTime}</Text> : null}
-          <View style={styles.openButton}>
-            <Text style={styles.openButtonText}>Se mer →</Text>
-          </View>
-        </View>
-      </Callout>
     </Marker>
   );
 }
 
 const styles = StyleSheet.create({
   pin: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  pinText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  callout: {
-    padding: 8,
-    minWidth: 140,
-  },
-  calloutTitle: {
-    fontWeight: '600',
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  calloutSub: {
-    fontSize: 12,
-    color: '#666',
-    textTransform: 'capitalize',
-    marginBottom: 2,
-  },
-  calloutTime: {
-    fontSize: 11,
-    color: '#999',
-    marginBottom: 6,
-  },
-  openButton: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
-  openButtonText: {
-    color: '#1a73e8',
-    fontSize: 12,
-    fontWeight: '600',
+  icon: {
+    fontSize: 20,
   },
 });

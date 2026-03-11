@@ -23,19 +23,11 @@ function TabIcon({ name, focused }) {
   return <Text style={{ fontSize: focused ? 22 : 18 }}>{icons[name]}</Text>;
 }
 
-const TAB_ICONS = { Aktiviteter: '🏃', Profil: '👤' };
+const TAB_ICONS = { Krets: '🏃', Profil: '👤' };
 
 function CustomTabBar({ state, navigation: tabNav, parentNav }) {
   return (
     <View style={styles.tabBarContainer}>
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => parentNav.navigate('CreateActivity')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
-
       <View style={styles.tabBar}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
@@ -47,12 +39,27 @@ function CustomTabBar({ state, navigation: tabNav, parentNav }) {
               activeOpacity={0.7}
             >
               <Text style={{ fontSize: focused ? 22 : 18 }}>{TAB_ICONS[route.name]}</Text>
-              <Text style={[styles.tabLabel, { color: focused ? '#1a73e8' : '#aaa' }]}>
+              <Text style={[styles.tabLabel, { color: focused ? '#7C5CBF' : '#aaa' }]}>
                 {route.name}
               </Text>
             </TouchableOpacity>
           );
-        })}
+        }).reduce((acc, item, i) => {
+          if (i === 1) {
+            acc.push(
+              <TouchableOpacity
+                key="fab"
+                style={styles.fab}
+                onPress={() => parentNav.navigate('CreateActivity')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.fabText}>+</Text>
+              </TouchableOpacity>
+            );
+          }
+          acc.push(item);
+          return acc;
+        }, [])}
       </View>
     </View>
   );
@@ -64,7 +71,7 @@ function MainTabs({ navigation }) {
       tabBar={(props) => <CustomTabBar {...props} parentNav={navigation} />}
       screenOptions={{ headerShown: true }}
     >
-      <Tab.Screen name="Aktiviteter" component={ActivitiesScreen} />
+      <Tab.Screen name="Krets" component={ActivitiesScreen} />
       <Tab.Screen name="Profil" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -98,16 +105,14 @@ function MainStack() {
           title: 'Ny aktivitet',
           presentation: 'modal',
           headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#1a73e8',
+          headerTintColor: '#7C5CBF',
         }}
       />
       <Stack.Screen
         name="ActivityDetail"
         component={ActivityDetail}
         options={{
-          title: 'Aktivitet',
-          headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#1a73e8',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -116,7 +121,7 @@ function MainStack() {
         options={{
           title: 'Profil',
           headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#1a73e8',
+          headerTintColor: '#7C5CBF',
         }}
       />
       <Stack.Screen
@@ -137,7 +142,7 @@ function RootNavigator() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#1a73e8" />
+        <ActivityIndicator size="large" color="#7C5CBF" />
       </View>
     );
   }
@@ -171,38 +176,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   tabBarContainer: {
-    alignItems: 'center',
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
   },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 32,
+    paddingTop: 12,
+  },
   fab: {
-    position: 'absolute',
-    top: -46,
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1a73e8',
+    shadowColor: '#7C5CBF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
-    zIndex: 10,
+    marginHorizontal: 16,
   },
   fabText: {
     color: '#fff',
     fontSize: 32,
     lineHeight: 36,
     fontWeight: '300',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    width: '100%',
-    paddingBottom: 32,
-    paddingTop: 20,
   },
   tabItem: {
     flex: 1,

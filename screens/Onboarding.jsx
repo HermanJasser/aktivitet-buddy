@@ -225,7 +225,7 @@ export default function OnboardingScreen({ route, navigation }) {
                 </View>
               )}
             </TouchableOpacity>
-            {uploading && <ActivityIndicator color="#1a73e8" style={{ marginTop: 12 }} />}
+            {uploading && <ActivityIndicator color="#7C5CBF" style={{ marginTop: 12 }} />}
           </View>
         );
       case 3:
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   dotActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     width: 24,
   },
   dotDone: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#111',
+    color: '#1A1A2E',
     marginBottom: 8,
   },
   stepSubtitle: {
@@ -506,15 +506,15 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     borderWidth: 2,
-    borderColor: '#1a73e8',
+    borderColor: '#7C5CBF',
   },
   avatarPlaceholder: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#EDE8FF',
     borderWidth: 2,
-    borderColor: '#1a73e8',
+    borderColor: '#7C5CBF',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholderLabel: {
     fontSize: 13,
-    color: '#1a73e8',
+    color: '#7C5CBF',
     marginTop: 6,
   },
   chips: {
@@ -541,8 +541,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
   },
   chipSelected: {
-    backgroundColor: '#1a73e8',
-    borderColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
+    borderColor: '#7C5CBF',
   },
   chipText: {
     fontSize: 14,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111',
+    color: '#1A1A2E',
     marginBottom: 16,
   },
   modalInput: {
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 10,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     alignItems: 'center',
   },
   modalConfirmText: {
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   },
   dateButtonText: {
     fontSize: 16,
-    color: '#111',
+    color: '#1A1A2E',
   },
   dateButtonPlaceholder: {
     fontSize: 16,
@@ -643,11 +643,11 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
+    color: '#1A1A2E',
   },
   pickerDone: {
     fontSize: 16,
-    color: '#1a73e8',
+    color: '#7C5CBF',
     fontWeight: '600',
   },
   closeButton: {
@@ -687,10 +687,10 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 15,
-    color: '#1a73e8',
+    color: '#7C5CBF',
   },
   primaryButton: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 10,

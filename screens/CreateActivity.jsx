@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,18 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Keyboard,
+  Animated,
+  Image,
 } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
+
+const PARTICIPANT_OPTIONS = Array.from({ length: 49 }, (_, i) => i + 2);
+const ITEM_HEIGHT = 52;
 
 const ACTIVITY_TYPES = [
   'Fotball', 'Basket', 'Håndball', 'Volleyball', 'Tennis', 'Padel',
@@ -29,20 +36,122 @@ const OSLO_REGION = {
   longitudeDelta: 0.08,
 };
 
-export default function CreateActivity({ navigation }) {
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState(null);
+export default function CreateActivity({ navigation, route }) {
+  const existing = route.params?.activity ?? null;
+  const isEditing = !!existing;
+
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [type, setType] = useState(existing?.type
+    ? existing.type.charAt(0).toUpperCase() + existing.type.slice(1)
+    : null);
   const [customType, setCustomType] = useState('');
   const [showCustomTypeModal, setShowCustomTypeModal] = useState(false);
-  const [description, setDescription] = useState('');
-  const [scheduledAt, setScheduledAt] = useState(new Date());
-  const [pickerMode, setPickerMode] = useState(null); // null | 'date' | 'time'
-  const [location, setLocation] = useState(null);
+  const [description, setDescription] = useState(existing?.description ?? '');
+  const [localImage, setLocalImage] = useState(null);
+  const [existingImageUrl, setExistingImageUrl] = useState(existing?.image_url ?? null);
+  const [maxParticipants, setMaxParticipants] = useState(existing?.max_participants ?? null);
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    if (existing?.scheduled_at) return new Date(existing.scheduled_at);
+    const d = new Date(); d.setMinutes(0, 0, 0); return d;
+  });
+  const [scheduledEnd, setScheduledEnd] = useState(() => {
+    if (existing?.scheduled_end) return new Date(existing.scheduled_end);
+    const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d;
+  });
+  const [hasEndTime, setHasEndTime] = useState(!!existing?.scheduled_end);
+  const [pickerMode, setPickerMode] = useState(null); // null | 'date' | 'timeStart' | 'timeEnd'
+  const [location, setLocation] = useState(
+    existing?.latitude && existing?.longitude
+      ? { latitude: existing.latitude, longitude: existing.longitude }
+      : null
+  );
+  const [locationLabel, setLocationLabel] = useState(null);
   const [addressQuery, setAddressQuery] = useState('');
   const [geocoding, setGeocoding] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef(null);
+  const titleRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const addressRef = useRef(null);
+  const pickerSlide = useRef(new Animated.Value(400)).current;
+  const pickerFade = useRef(new Animated.Value(0)).current;
+  const participantsScrollRef = useRef(null);
+
+  const openPicker = useCallback((mode) => {
+    setPickerMode(mode);
+    Animated.parallel([
+      Animated.timing(pickerFade, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(pickerSlide, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const closePicker = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(pickerFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(pickerSlide, { toValue: 400, duration: 200, useNativeDriver: true }),
+    ]).start(() => setPickerMode(null));
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', e => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  useEffect(() => {
+    if (pickerMode === 'participants') {
+      const idx = maxParticipants != null ? PARTICIPANT_OPTIONS.indexOf(maxParticipants) : -1;
+      const safeIdx = idx >= 0 ? idx : 0;
+      setTimeout(() => {
+        participantsScrollRef.current?.scrollTo({ y: safeIdx * ITEM_HEIGHT, animated: false });
+      }, 50);
+    }
+  }, [pickerMode]);
+
+  useEffect(() => {
+    if (isEditing) {
+      navigation.setOptions({ title: 'Rediger aktivitet' });
+      if (existing.latitude && existing.longitude) {
+        Location.reverseGeocodeAsync({ latitude: existing.latitude, longitude: existing.longitude })
+          .then(results => {
+            if (results.length > 0) {
+              const r = results[0];
+              const parts = [r.street, r.streetNumber, r.city].filter(Boolean);
+              setLocationLabel(parts.length > 0 ? parts.join(' ') : r.name ?? null);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, []);
+
+  async function setLocationWithLabel(coords, label = null) {
+    setLocation(coords);
+    if (label) {
+      setLocationLabel(label);
+      return;
+    }
+    try {
+      const results = await Location.reverseGeocodeAsync(coords);
+      if (results.length > 0) {
+        const r = results[0];
+        const parts = [r.street, r.streetNumber, r.city].filter(Boolean);
+        setLocationLabel(parts.length > 0 ? parts.join(' ') : r.name ?? null);
+      }
+    } catch {
+      setLocationLabel(null);
+    }
+  }
+
+  function scrollToInput(inputRef) {
+    if (!inputRef?.current || !scrollRef?.current) return;
+    inputRef.current.measureLayout(scrollRef.current, (x, y) => {
+      scrollRef.current.scrollTo({ y: y - 120, animated: true });
+    }, () => {});
+  }
 
   async function fetchUserLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -57,7 +166,7 @@ export default function CreateActivity({ navigation }) {
       Alert.alert('Tilgang nektet', 'Gi tilgang til posisjon i innstillinger.');
       return;
     }
-    setLocation(coords);
+    setLocationWithLabel(coords);
     setShowMap(false);
     Alert.alert('Posisjon hentet', 'Din nåværende posisjon er valgt.');
   }
@@ -79,7 +188,7 @@ export default function CreateActivity({ navigation }) {
         Alert.alert('Ikke funnet', 'Fant ingen resultater for adressen. Prøv å være mer spesifikk.');
       } else {
         const { latitude, longitude } = results[0];
-        setLocation({ latitude, longitude });
+        setLocationWithLabel({ latitude, longitude }, addressQuery.trim());
         setShowMap(false);
       }
     } catch {
@@ -90,12 +199,54 @@ export default function CreateActivity({ navigation }) {
   }
 
   function onMapPress(e) {
-    setLocation(e.nativeEvent.coordinate);
+    setLocationWithLabel(e.nativeEvent.coordinate);
+  }
+
+  function combineDateAndTime(dateSource, timeSource) {
+    const result = new Date(dateSource);
+    result.setHours(timeSource.getHours(), timeSource.getMinutes(), 0, 0);
+    return result;
   }
 
   function onDateChange(event, selectedDate) {
-    if (selectedDate) setScheduledAt(selectedDate);
+    if (!selectedDate) return;
+    if (pickerMode === 'date') {
+      setScheduledAt(combineDateAndTime(selectedDate, scheduledAt));
+      setScheduledEnd(combineDateAndTime(selectedDate, scheduledEnd));
+    } else if (pickerMode === 'timeStart') {
+      setScheduledAt(combineDateAndTime(scheduledAt, selectedDate));
+    } else if (pickerMode === 'timeEnd') {
+      setScheduledEnd(combineDateAndTime(scheduledAt, selectedDate));
+    }
     if (Platform.OS === 'android') setPickerMode(null);
+  }
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Tilgang nektet', 'Gi tilgang til bilder i innstillinger.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setLocalImage(result.assets[0].uri);
+    }
+  }
+
+  async function uploadImage(uri, userId) {
+    const path = `${userId}/${Date.now()}.jpg`;
+    const arraybuffer = await fetch(uri).then(r => r.arrayBuffer());
+    const { error } = await supabase.storage
+      .from('activity-images')
+      .upload(path, arraybuffer, { contentType: 'image/jpeg', upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('activity-images').getPublicUrl(path);
+    return data.publicUrl;
   }
 
   async function handleSave() {
@@ -115,15 +266,32 @@ export default function CreateActivity({ navigation }) {
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from('activities').insert({
+    let image_url = existingImageUrl;
+    if (localImage) {
+      try {
+        image_url = await uploadImage(localImage, user.id);
+      } catch (e) {
+        setSaving(false);
+        Alert.alert('Feil', 'Kunne ikke laste opp bilde. Prøv igjen.');
+        return;
+      }
+    }
+
+    const payload = {
       title: title.trim(),
       type: type.toLowerCase(),
       description: description.trim() || null,
       latitude: location.latitude,
       longitude: location.longitude,
       scheduled_at: scheduledAt.toISOString(),
-      user_id: user.id,
-    });
+      scheduled_end: hasEndTime ? scheduledEnd.toISOString() : null,
+      max_participants: maxParticipants ? parseInt(maxParticipants) : null,
+      image_url,
+    };
+
+    const { error } = isEditing
+      ? await supabase.from('activities').update(payload).eq('id', existing.id)
+      : await supabase.from('activities').insert({ ...payload, user_id: user.id });
 
     setSaving(false);
 
@@ -139,24 +307,25 @@ export default function CreateActivity({ navigation }) {
     month: '2-digit',
     year: 'numeric',
   });
-  const formattedTime = scheduledAt.toLocaleTimeString('nb-NO', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedTimeStart = scheduledAt.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+  const formattedTimeEnd = scheduledEnd.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
+      contentContainerStyle={{ paddingBottom: keyboardHeight ? keyboardHeight + 20 : 40 }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      automaticallyAdjustKeyboardInsets
     >
       <Text style={styles.label}>Tittel *</Text>
       <TextInput
+        ref={titleRef}
         style={styles.input}
         placeholder="F.eks. Fotball på Frogner"
         value={title}
         onChangeText={setTitle}
+        onFocus={() => scrollToInput(titleRef)}
       />
 
       <Text style={styles.label}>Type *</Text>
@@ -233,6 +402,7 @@ export default function CreateActivity({ navigation }) {
 
       <Text style={styles.label}>Beskrivelse</Text>
       <TextInput
+        ref={descriptionRef}
         style={[styles.input, styles.inputMultiline]}
         placeholder="Valgfri beskrivelse..."
         value={description}
@@ -241,48 +411,118 @@ export default function CreateActivity({ navigation }) {
         numberOfLines={3}
         returnKeyType="done"
         blurOnSubmit
+        onFocus={() => scrollToInput(descriptionRef)}
       />
 
+      <Text style={styles.label}>Bilde</Text>
+      {localImage || existingImageUrl ? (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: localImage || existingImageUrl }} style={styles.imagePreview} />
+          <TouchableOpacity
+            style={styles.removeImageBtn}
+            onPress={() => { setLocalImage(null); setExistingImageUrl(null); }}
+          >
+            <Text style={styles.removeImageText}>✕</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.changeImageBtn} onPress={pickImage}>
+            <Text style={styles.changeImageText}>Bytt bilde</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+          <Text style={styles.imagePickerText}>+ Velg bilde</Text>
+        </TouchableOpacity>
+      )}
+
+      <Text style={styles.label}>Antall deltakere</Text>
+      <TouchableOpacity style={styles.dateButton} onPress={() => openPicker('participants')}>
+        <Text style={styles.dateButtonText}>
+          {maxParticipants ?? 'Ikke satt'}
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.label}>Tidspunkt *</Text>
+      <TouchableOpacity style={[styles.dateButton, { marginBottom: 8 }]} onPress={() => openPicker('date')}>
+        <Text style={styles.dateButtonText}>{formattedDate}</Text>
+      </TouchableOpacity>
       <View style={styles.dateRow}>
-        <TouchableOpacity style={styles.dateButton} onPress={() => setPickerMode('date')}>
-          <Text style={styles.dateButtonText}>{formattedDate}</Text>
+        <TouchableOpacity style={styles.dateButton} onPress={() => openPicker('timeStart')}>
+          <Text style={styles.dateButtonLabel}>Fra</Text>
+          <Text style={styles.dateButtonText}>{formattedTimeStart}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.dateButton} onPress={() => setPickerMode('time')}>
-          <Text style={styles.dateButtonText}>{formattedTime}</Text>
-        </TouchableOpacity>
+        {hasEndTime ? (
+          <TouchableOpacity style={styles.dateButton} onPress={() => openPicker('timeEnd')}>
+            <Text style={styles.dateButtonLabel}>Til</Text>
+            <Text style={styles.dateButtonText}>{formattedTimeEnd}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.dateButton, styles.addEndTimeBtn]}
+            onPress={() => setHasEndTime(true)}
+          >
+            <Text style={styles.addEndTimeText}>+ Legg til sluttid</Text>
+          </TouchableOpacity>
+        )}
       </View>
+      {hasEndTime && (
+        <TouchableOpacity onPress={() => setHasEndTime(false)}>
+          <Text style={styles.removeEndTimeText}>Fjern sluttid</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={pickerMode !== null}
         transparent
-        animationType="slide"
-        onRequestClose={() => setPickerMode(null)}
+        animationType="none"
+        onRequestClose={closePicker}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setPickerMode(null)}
-        />
-        <View style={styles.pickerModal}>
-          <View style={styles.pickerHeader}>
-            <Text style={styles.pickerTitle}>
-              {pickerMode === 'date' ? 'Velg dato' : 'Velg tidspunkt'}
-            </Text>
-            <TouchableOpacity onPress={() => setPickerMode(null)}>
-              <Text style={styles.pickerDone}>Ferdig</Text>
-            </TouchableOpacity>
-          </View>
-          {pickerMode !== null && (
-            <DateTimePicker
-              value={scheduledAt}
-              mode={pickerMode}
-              display="spinner"
-              onChange={onDateChange}
-              minimumDate={pickerMode === 'date' ? new Date() : undefined}
-              textColor="#000000"
-            />
-          )}
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View style={[styles.modalBackdrop, { opacity: pickerFade, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closePicker} />
+          </Animated.View>
+          <Animated.View style={[styles.pickerModal, { transform: [{ translateY: pickerSlide }] }]}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>
+                {pickerMode === 'date' ? 'Velg dato' : pickerMode === 'timeStart' ? 'Fra-tidspunkt' : pickerMode === 'timeEnd' ? 'Til-tidspunkt' : 'Antall deltakere'}
+              </Text>
+              <TouchableOpacity onPress={closePicker}>
+                <Text style={styles.pickerDone}>Ferdig</Text>
+              </TouchableOpacity>
+            </View>
+            {pickerMode === 'participants' ? (
+              <View style={styles.participantsPickerContainer}>
+                <View pointerEvents="none" style={styles.participantsPickerHighlight} />
+                <ScrollView
+                  ref={participantsScrollRef}
+                  style={{ height: ITEM_HEIGHT * 3 }}
+                  snapToInterval={ITEM_HEIGHT}
+                  decelerationRate="fast"
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
+                  onMomentumScrollEnd={e => {
+                    const index = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+                    const clamped = Math.max(0, Math.min(index, PARTICIPANT_OPTIONS.length - 1));
+                    setMaxParticipants(PARTICIPANT_OPTIONS[clamped] ?? null);
+                  }}
+                >
+                  {PARTICIPANT_OPTIONS.map((n, i) => (
+                    <View key={i} style={styles.participantsPickerItem}>
+                      <Text style={styles.participantsPickerText}>{n}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : pickerMode !== null ? (
+              <DateTimePicker
+                value={pickerMode === 'timeEnd' ? scheduledEnd : scheduledAt}
+                mode={pickerMode === 'date' ? 'date' : 'time'}
+                display="spinner"
+                onChange={onDateChange}
+                minimumDate={pickerMode === 'date' ? new Date() : undefined}
+                textColor="#000000"
+              />
+            ) : null}
+          </Animated.View>
         </View>
       </Modal>
 
@@ -303,12 +543,14 @@ export default function CreateActivity({ navigation }) {
 
       <View style={styles.addressRow}>
         <TextInput
+          ref={addressRef}
           style={styles.addressInput}
           placeholder="Søk på adresse..."
           value={addressQuery}
           onChangeText={setAddressQuery}
           returnKeyType="search"
           onSubmitEditing={geocodeAddress}
+          onFocus={() => scrollToInput(addressRef)}
         />
         <TouchableOpacity
           style={[styles.addressSearchBtn, geocoding && { backgroundColor: '#aaa' }]}
@@ -324,7 +566,7 @@ export default function CreateActivity({ navigation }) {
 
       {location && !showMap && (
         <Text style={styles.locationInfo}>
-          Posisjon valgt: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+          {locationLabel ?? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
         </Text>
       )}
 
@@ -362,10 +604,9 @@ export default function CreateActivity({ navigation }) {
         onPress={handleSave}
         disabled={saving}
       >
-        <Text style={styles.saveButtonText}>{saving ? 'Lagrer...' : 'Lagre aktivitet'}</Text>
+        <Text style={styles.saveButtonText}>{saving ? 'Lagrer...' : isEditing ? 'Oppdater aktivitet' : 'Lagre aktivitet'}</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
@@ -373,7 +614,7 @@ export default function CreateActivity({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     padding: 16,
   },
   label: {
@@ -405,14 +646,14 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#1a73e8',
+    borderColor: '#7C5CBF',
     backgroundColor: '#fff',
   },
   typeChipActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
   },
   typeChipText: {
-    color: '#1a73e8',
+    color: '#7C5CBF',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -431,6 +672,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  dateButtonLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  addEndTimeBtn: {
+    justifyContent: 'center',
+  },
+  addEndTimeText: {
+    color: '#7C5CBF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  removeEndTimeText: {
+    color: '#999',
+    fontSize: 13,
+    marginTop: 6,
+    textDecorationLine: 'underline',
   },
   dateButtonText: {
     fontSize: 15,
@@ -455,7 +717,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   addressSearchBtn: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     borderRadius: 10,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -473,13 +735,13 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#1a73e8',
+    borderColor: '#7C5CBF',
   },
   locationButtonActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
   },
   locationButtonText: {
-    color: '#1a73e8',
+    color: '#7C5CBF',
     fontSize: 14,
     fontWeight: '500',
   },
@@ -508,7 +770,7 @@ const styles = StyleSheet.create({
     height: 260,
   },
   confirmMapButton: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     padding: 12,
     alignItems: 'center',
   },
@@ -518,7 +780,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   saveButton: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -534,13 +796,14 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   pickerModal: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 30,
+    alignItems: 'center',
   },
   pickerHeader: {
     flexDirection: 'row',
@@ -550,6 +813,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    alignSelf: 'stretch',
   },
   pickerTitle: {
     fontSize: 16,
@@ -558,7 +822,7 @@ const styles = StyleSheet.create({
   },
   pickerDone: {
     fontSize: 16,
-    color: '#1a73e8',
+    color: '#7C5CBF',
     fontWeight: '600',
   },
   picker: {
@@ -584,7 +848,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   customTypeInput: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
@@ -612,11 +876,88 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#7C5CBF',
     alignItems: 'center',
   },
   customTypeConfirmText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  imagePickerBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#7C5CBF',
+    borderStyle: 'dashed',
+    padding: 20,
+    alignItems: 'center',
+  },
+  imagePickerText: {
+    color: '#7C5CBF',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 10,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  changeImageBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  changeImageText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  participantsPickerContainer: {
+    width: '100%',
+    position: 'relative',
+  },
+  participantsPickerHighlight: {
+    position: 'absolute',
+    top: ITEM_HEIGHT,
+    left: 24,
+    right: 24,
+    height: ITEM_HEIGHT,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  participantsPickerItem: {
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantsPickerText: {
+    fontSize: 17,
+    color: '#333',
   },
 });
