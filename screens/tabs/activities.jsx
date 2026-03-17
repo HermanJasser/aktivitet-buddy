@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,17 +45,6 @@ const ACTIVITY_TYPES = [
   'klatring', 'fjelltur', 'slalom', 'randone', 'skating', 'skøyting', 'fisking',
 ];
 
-const RADIUS_OPTIONS = [1, 2, 5, 10, 25, 50];
-const TIME_OPTIONS = [
-  { label: 'I dag', value: 'today' },
-  { label: 'Denne uken', value: 'week' },
-  { label: 'Denne måneden', value: 'month' },
-];
-const PARTICIPANT_OPTIONS = [
-  { label: '2–5', value: 'small' },
-  { label: '6–15', value: 'medium' },
-  { label: '16+', value: 'large' },
-];
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -82,14 +72,9 @@ export default function ActivitiesScreen({ navigation }) {
   const filterSlide = useRef(new Animated.Value(600)).current;
   const filterFade = useRef(new Animated.Value(0)).current;
   const [filterTypes, setFilterTypes] = useState([]);
-  const [filterRadius, setFilterRadius] = useState(null);
-  const [filterTime, setFilterTime] = useState(null);
-  const [filterParticipants, setFilterParticipants] = useState(null);
-
+  const [filterRadius, setFilterRadius] = useState(0);
   const activeFiltersCount = (filterTypes.length > 0 ? 1 : 0)
-    + (filterRadius ? 1 : 0)
-    + (filterTime ? 1 : 0)
-    + (filterParticipants ? 1 : 0);
+    + (filterRadius > 0 ? 1 : 0);
 
   useEffect(() => {
     navigation.setOptions({
@@ -135,48 +120,23 @@ export default function ActivitiesScreen({ navigation }) {
     let result = activities;
 
     if (filterTypes.length > 0) {
-      result = result.filter(a => filterTypes.includes(a.type?.toLowerCase()));
+      result = result.filter(a => {
+        const t = a.type?.toLowerCase();
+        if (filterTypes.includes(t)) return true;
+        if (filterTypes.includes('annet') && !ACTIVITY_TYPES.includes(t)) return true;
+        return false;
+      });
     }
 
-    if (filterRadius && location) {
+    if (filterRadius > 0 && location) {
       result = result.filter(a => {
         if (!a.latitude || !a.longitude) return false;
         return getDistanceKm(location.latitude, location.longitude, a.latitude, a.longitude) <= filterRadius;
       });
     }
 
-    if (filterTime) {
-      const now = new Date();
-      result = result.filter(a => {
-        const date = new Date(a.scheduled_at);
-        if (filterTime === 'today') {
-          return date.toDateString() === now.toDateString();
-        }
-        if (filterTime === 'week') {
-          const week = new Date(now); week.setDate(now.getDate() + 7);
-          return date <= week;
-        }
-        if (filterTime === 'month') {
-          const month = new Date(now); month.setMonth(now.getMonth() + 1);
-          return date <= month;
-        }
-        return true;
-      });
-    }
-
-    if (filterParticipants) {
-      result = result.filter(a => {
-        const max = a.max_participants;
-        if (!max) return filterParticipants === 'large';
-        if (filterParticipants === 'small') return max <= 5;
-        if (filterParticipants === 'medium') return max >= 6 && max <= 15;
-        if (filterParticipants === 'large') return max >= 16 || !max;
-        return true;
-      });
-    }
-
     return result;
-  }, [activities, filterTypes, filterRadius, filterTime, filterParticipants, location]);
+  }, [activities, filterTypes, filterRadius, location]);
 
   function openFilter() {
     setFilterVisible(true);
@@ -195,9 +155,7 @@ export default function ActivitiesScreen({ navigation }) {
 
   function resetFilters() {
     setFilterTypes([]);
-    setFilterRadius(null);
-    setFilterTime(null);
-    setFilterParticipants(null);
+    setFilterRadius(0);
   }
 
   function toggleType(type) {
@@ -401,57 +359,39 @@ export default function ActivitiesScreen({ navigation }) {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  style={[styles.filterChip, filterTypes.includes('annet') && styles.filterChipActive]}
+                  onPress={() => toggleType('annet')}
+                >
+                  <Text style={[styles.filterChipText, filterTypes.includes('annet') && styles.filterChipTextActive]}>
+                    🏅 Annet
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Radius */}
-              <Text style={styles.filterSectionTitle}>
-                Radius{!location ? ' (krever posisjon)' : ''}
-              </Text>
-              <View style={styles.chipRow}>
-                {RADIUS_OPTIONS.map(r => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.filterChip, filterRadius === r && styles.filterChipActive, !location && styles.filterChipDisabled]}
-                    onPress={() => location && setFilterRadius(filterRadius === r ? null : r)}
-                  >
-                    <Text style={[styles.filterChipText, filterRadius === r && styles.filterChipTextActive]}>
-                      {r} km
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.filterRadiusHeader}>
+                <Text style={styles.filterSectionTitle}>
+                  Radius{!location ? ' (krever posisjon)' : ''}
+                </Text>
+                <Text style={styles.filterRadiusValue}>
+                  {filterRadius === 0 ? 'Av' : `${filterRadius} km`}
+                </Text>
               </View>
+              <Slider
+                style={styles.radiusSlider}
+                minimumValue={0}
+                maximumValue={50}
+                step={1}
+                value={filterRadius}
+                onValueChange={v => location && setFilterRadius(v)}
+                minimumTrackTintColor={location ? '#7C5CBF' : '#ccc'}
+                maximumTrackTintColor="#E4DCFF"
+                thumbTintColor={location ? '#7C5CBF' : '#ccc'}
+                disabled={!location}
+              />
 
-              {/* Tidspunkt */}
-              <Text style={styles.filterSectionTitle}>Tidspunkt</Text>
-              <View style={styles.chipRow}>
-                {TIME_OPTIONS.map(t => (
-                  <TouchableOpacity
-                    key={t.value}
-                    style={[styles.filterChip, filterTime === t.value && styles.filterChipActive]}
-                    onPress={() => setFilterTime(filterTime === t.value ? null : t.value)}
-                  >
-                    <Text style={[styles.filterChipText, filterTime === t.value && styles.filterChipTextActive]}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
-              {/* Deltakere */}
-              <Text style={styles.filterSectionTitle}>Antall deltakere</Text>
-              <View style={styles.chipRow}>
-                {PARTICIPANT_OPTIONS.map(p => (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[styles.filterChip, filterParticipants === p.value && styles.filterChipActive]}
-                    onPress={() => setFilterParticipants(filterParticipants === p.value ? null : p.value)}
-                  >
-                    <Text style={[styles.filterChipText, filterParticipants === p.value && styles.filterChipTextActive]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </ScrollView>
 
             <TouchableOpacity style={styles.filterApplyBtn} onPress={closeFilter}>
@@ -608,6 +548,22 @@ const styles = StyleSheet.create({
   },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterRadiusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  filterRadiusValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7C5CBF',
+  },
+  radiusSlider: {
+    width: '100%',
+    height: 40,
+  },
   filterChip: {
     borderWidth: 1.5, borderColor: '#E4DCFF',
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
