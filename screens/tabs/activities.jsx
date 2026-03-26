@@ -36,14 +36,14 @@ const ACTIVITY_ICONS = {
   fotball: '⚽', basket: '🏀', håndball: '🤾', volleyball: '🏐',
   tennis: '🎾', padel: '🏓', squash: '🎾', bordtennis: '🏓',
   løping: '🏃', sykling: '🚴', svømming: '🏊', trening: '💪',
-  klatring: '🧗', fjelltur: '🥾', slalom: '⛷️', randone: '🎿',
+  klatring: '🧗', tur: '🥾', slalom: '⛷️', randone: '🎿', golf: '⛳', 'disc golf': '🥏',
   skating: '🛹', skøyting: '⛸️', fisking: '🎣',
 };
 
 const ACTIVITY_TYPES = [
   'fotball', 'basket', 'håndball', 'volleyball', 'tennis', 'padel',
   'squash', 'bordtennis', 'løping', 'sykling', 'svømming', 'trening',
-  'klatring', 'fjelltur', 'slalom', 'randone', 'skating', 'skøyting', 'fisking',
+  'klatring', 'tur', 'slalom', 'randone', 'skating', 'skøyting', 'fisking', 'golf', 'disc golf',
 ];
 
 
