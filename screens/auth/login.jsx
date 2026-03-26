@@ -35,15 +35,27 @@ export default function LoginScreen({ navigation }) {
       console.log('Redirect URL:', redirectUrl);
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
+        options: { redirectTo: redirectUrl, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
       });
       console.log('OAuth data:', JSON.stringify(data));
       console.log('OAuth error:', JSON.stringify(error));
       if (error) throw error;
       if (data?.url) {
-        console.log('Opening URL:', data.url);
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        console.log('Browser result:', JSON.stringify(result));
+        if (result.type === 'success' && result.url) {
+          const hashMatch = result.url.match(/#(.+)$/);
+          if (hashMatch) {
+            const params = new URLSearchParams(hashMatch[1]);
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            if (access_token && refresh_token) {
+              const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+              if (sessionError) throw sessionError;
+            } else {
+              throw new Error('Ingen tokens i redirect-URL');
+            }
+          }
+        }
       }
     } catch (e) {
       Alert.alert('Google-innlogging feilet', e.message);

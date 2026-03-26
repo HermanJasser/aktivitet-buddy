@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { MaterialIcons } from '@expo/vector-icons';
 import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
@@ -64,8 +65,10 @@ export default function ActivitiesScreen({ navigation }) {
   const [locationError, setLocationError] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [mapEpoch, setMapEpoch] = useState(0);
+  const [isCentered, setIsCentered] = useState(true);
   const slideAnim = useRef(new Animated.Value(200)).current;
   const deselectTimer = useRef(null);
+  const mapRef = useRef(null);
 
   // Filter state
   const [filterVisible, setFilterVisible] = useState(false);
@@ -236,25 +239,6 @@ export default function ActivitiesScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Filter button */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={[styles.filterBtn, activeFiltersCount > 0 && styles.filterBtnActive]} onPress={openFilter}>
-          <Text style={[styles.filterBtnText, activeFiltersCount > 0 && styles.filterBtnTextActive]}>
-            Filtrer
-          </Text>
-          {activeFiltersCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        {activeFiltersCount > 0 && (
-          <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
-            <Text style={styles.resetBtnText}>Nullstill</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Toggle */}
       <View style={styles.toggle}>
         <TouchableOpacity
@@ -285,12 +269,13 @@ export default function ActivitiesScreen({ navigation }) {
               </View>
             )}
             <MapView
+              ref={mapRef}
               style={styles.map}
               provider={PROVIDER_DEFAULT}
               initialRegion={region}
               showsUserLocation={!!location}
-              showsMyLocationButton
               onPress={deselectActivity}
+              onPanDrag={() => setIsCentered(false)}
             >
               {filteredActivities.filter(a => a.latitude && a.longitude).map(activity => (
                 <ActivityPin
@@ -300,6 +285,35 @@ export default function ActivitiesScreen({ navigation }) {
                 />
               ))}
             </MapView>
+            <TouchableOpacity
+              style={[styles.mapFilterBtn, activeFiltersCount > 0 && styles.mapFilterBtnActive]}
+              onPress={openFilter}
+            >
+              <Text style={[styles.mapFilterBtnText, activeFiltersCount > 0 && styles.mapFilterBtnTextActive]}>
+                Filter{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.locationButton, isCentered && styles.locationButtonActive]}
+              onPress={() => {
+                if (location) {
+                  mapRef.current?.animateToRegion({
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                  });
+                  setIsCentered(true);
+                }
+              }}
+            >
+              <MaterialIcons
+                name="near-me"
+                size={22}
+                color={isCentered ? '#fff' : '#555'}
+              />
+            </TouchableOpacity>
             {renderBottomCard()}
           </View>
         )
@@ -309,23 +323,33 @@ export default function ActivitiesScreen({ navigation }) {
             <ActivityIndicator size="large" color="#7C5CBF" />
           </View>
         ) : (
-          <FlatList
-            data={filteredActivities}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <ActivityCard
-                activity={item}
-                onPress={() => navigation.navigate('ActivityDetail', { activity: item })}
-              />
-            )}
-            contentContainerStyle={filteredActivities.length === 0 ? styles.emptyContainer : { paddingVertical: 8 }}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Text style={styles.emptyText}>Ingen aktiviteter funnet.</Text>
-                <Text style={styles.emptySubtext}>Prøv å justere filtrene.</Text>
-              </View>
-            }
-          />
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={filteredActivities}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <ActivityCard
+                  activity={item}
+                  onPress={() => navigation.navigate('ActivityDetail', { activity: item })}
+                />
+              )}
+              contentContainerStyle={filteredActivities.length === 0 ? styles.emptyContainer : { paddingTop: 60, paddingBottom: 8 }}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Text style={styles.emptyText}>Ingen aktiviteter funnet.</Text>
+                  <Text style={styles.emptySubtext}>Prøv å justere filtrene.</Text>
+                </View>
+              }
+            />
+            <TouchableOpacity
+              style={[styles.mapFilterBtn, activeFiltersCount > 0 && styles.mapFilterBtnActive]}
+              onPress={openFilter}
+            >
+              <Text style={[styles.mapFilterBtnText, activeFiltersCount > 0 && styles.mapFilterBtnTextActive]}>
+                Filter{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )
       )}
 
@@ -477,6 +501,65 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 15, fontWeight: '500', color: '#aaa' },
   toggleTextActive: { color: '#7C5CBF', fontWeight: '700' },
   mapContainer: { flex: 1 },
+  sharedFilterBtn: {
+    alignSelf: 'flex-start',
+    marginHorizontal: 12,
+    marginVertical: 8,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapFilterBtn: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  mapFilterBtnActive: {
+    backgroundColor: '#7C5CBF',
+  },
+  mapFilterBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  mapFilterBtnTextActive: {
+    color: '#fff',
+  },
+  locationButton: {
+    position: 'absolute',
+    bottom: 32,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  locationButtonActive: {
+    backgroundColor: '#7C5CBF',
+  },
   map: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 12, color: '#666' },

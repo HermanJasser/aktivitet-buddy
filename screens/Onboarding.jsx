@@ -35,7 +35,7 @@ const FIRST_STEP_EDIT = 2;
 const LAST_STEP_NEW = 5;
 const LAST_STEP_EDIT = 4;
 
-export default function OnboardingScreen({ route, navigation }) {
+export default function OnboardingScreen({ route, navigation, onDone }) {
   const editing = route?.params?.editing ?? false;
   const { session, profile, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -147,6 +147,7 @@ export default function OnboardingScreen({ route, navigation }) {
       if (error) throw error;
       await refreshProfile();
       if (editing) navigation.goBack();
+      else if (onDone) onDone();
     } catch (e) {
       Alert.alert('Lagringsfeil', e.message);
     } finally {

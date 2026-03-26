@@ -86,10 +86,12 @@ function AuthStack() {
   );
 }
 
-function OnboardingStack() {
+function OnboardingStack({ onDone }) {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="Onboarding">
+        {(props) => <OnboardingScreen {...props} onDone={onDone} />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }
@@ -137,7 +139,7 @@ function MainStack() {
 }
 
 function RootNavigator() {
-  const { session, loading, profileComplete } = useAuth();
+  const { session, loading, needsOnboarding, setNeedsOnboarding } = useAuth();
 
   if (loading) {
     return (
@@ -151,8 +153,8 @@ function RootNavigator() {
     <NavigationContainer>
       {!session ? (
         <AuthStack />
-      ) : !profileComplete ? (
-        <OnboardingStack />
+      ) : needsOnboarding ? (
+        <OnboardingStack onDone={() => setNeedsOnboarding(false)} />
       ) : (
         <MainStack />
       )}

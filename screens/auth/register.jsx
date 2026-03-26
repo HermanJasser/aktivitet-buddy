@@ -12,6 +12,7 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -20,18 +21,14 @@ export default function RegisterScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const { triggerOnboarding, setNeedsOnboarding } = useAuth();
 
   async function handleRegister() {
     setLoading(true);
+    triggerOnboarding();
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
       Alert.alert('Registreringsfeil', error.message);
-    } else {
-      Alert.alert(
-        'Sjekk e-posten din',
-        'Vi har sendt deg en bekreftelseslenke.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
     }
     setLoading(false);
   }
@@ -45,7 +42,21 @@ export default function RegisterScreen({ navigation }) {
         options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
       });
       if (error) throw error;
-      if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+        if (result.type === 'success' && result.url) {
+          const hashMatch = result.url.match(/#(.+)$/);
+          if (hashMatch) {
+            const params = new URLSearchParams(hashMatch[1]);
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            if (access_token && refresh_token) {
+              triggerOnboarding();
+              await supabase.auth.setSession({ access_token, refresh_token });
+            }
+          }
+        }
+      }
     } catch (e) {
       Alert.alert('Google-innlogging feilet', e.message);
     } finally {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import MapView, { PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +17,7 @@ export default function MapScreen({ navigation }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState([]);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -69,11 +70,11 @@ export default function MapScreen({ navigation }) {
         </View>
       )}
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_DEFAULT}
         initialRegion={region}
         showsUserLocation={!!location}
-        showsMyLocationButton
       >
         {activities.map((activity) => (
           <ActivityPin
@@ -85,6 +86,20 @@ export default function MapScreen({ navigation }) {
           />
         ))}
       </MapView>
+      <TouchableOpacity
+        style={styles.locationButton}
+        onPress={() =>
+          location &&
+          mapRef.current?.animateToRegion({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          })
+        }
+      >
+        <Text style={styles.locationButtonText}>📍</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -104,6 +119,25 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: '#666',
+  },
+  locationButton: {
+    position: 'absolute',
+    bottom: 110,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  locationButtonText: {
+    fontSize: 22,
   },
   errorBanner: {
     backgroundColor: '#fff3cd',
