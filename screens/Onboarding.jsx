@@ -37,7 +37,7 @@ const LAST_STEP_EDIT = 4;
 
 export default function OnboardingScreen({ route, navigation, onDone }) {
   const editing = route?.params?.editing ?? false;
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, refreshProfile, setNeedsOnboarding } = useAuth();
   const insets = useSafeAreaInsets();
   const userId = session?.user?.id;
 
@@ -86,7 +86,7 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -145,9 +145,13 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
         updated_at: new Date().toISOString(),
       });
       if (error) throw error;
-      await refreshProfile();
-      if (editing) navigation.goBack();
-      else if (onDone) onDone();
+      if (editing) {
+        await refreshProfile();
+        navigation.goBack();
+      } else {
+        setNeedsOnboarding(false);
+        refreshProfile();
+      }
     } catch (e) {
       Alert.alert('Lagringsfeil', e.message);
     } finally {
@@ -175,6 +179,7 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
 
   function canProceed() {
     if (step === 1) return fullName.trim().length > 0;
+    if (step === 5 && !editing) return !!birthDate && birthDate <= MAX_BIRTH_DATE;
     return true;
   }
 
@@ -286,7 +291,7 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Når er du født?</Text>
             <Text style={styles.stepSubtitle}>Du må være minst 18 år for å bruke appen</Text>
-            <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity style={styles.dateButton} onPress={() => { if (!birthDate) setBirthDate(MAX_BIRTH_DATE); setShowDatePicker(true); }}>
               <Text style={birthDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
                 {birthDate ? birthDate.toLocaleDateString('nb-NO') : 'Velg fødselsdato'}
               </Text>

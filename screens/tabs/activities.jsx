@@ -81,7 +81,11 @@ export default function ActivitiesScreen({ navigation }) {
 
   useEffect(() => {
     navigation.setOptions({
-      headerRight: null,
+      headerRight: () => (
+        <TouchableOpacity style={{ marginRight: 16 }} onPress={() => navigation.navigate('ChatList')}>
+          <MaterialIcons name="chat-bubble-outline" size={24} color="#7C5CBF" />
+        </TouchableOpacity>
+      ),
       headerTitle: () => (
         <Text style={{ fontSize: 26, fontWeight: '900', color: '#1A1A2E', letterSpacing: -0.5 }}>
           Krets

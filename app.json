@@ -13,6 +13,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.hermanjasser.aktivitetbuddy",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "aktivitet-buddy bruker posisjonen din for å vise aktiviteter i nærheten.",

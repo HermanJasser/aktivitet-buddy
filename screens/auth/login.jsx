@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../../lib/supabase';
@@ -20,6 +21,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin() {
     setLoading(true);
@@ -81,14 +83,19 @@ export default function LoginScreen({ navigation }) {
         keyboardType="email-address"
         autoComplete="email"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Passord"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="password"
-      />
+      <View style={styles.passwordRow}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Passord"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoComplete="password"
+        />
+        <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(v => !v)}>
+          <MaterialIcons name={showPassword ? 'visibility-off' : 'visibility'} size={22} color="#aaa" />
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}
@@ -150,6 +157,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+  },
+  passwordRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    backgroundColor: '#f9f9f9',
+    marginBottom: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 16,
+  },
+  eyeBtn: {
+    paddingHorizontal: 14,
   },
   button: {
     width: '100%',

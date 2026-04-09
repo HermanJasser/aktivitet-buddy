@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, ActivityIndicator, View, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { useAuth, AuthProvider } from './hooks/useAuth';
 import LoginScreen from './screens/auth/login';
@@ -14,6 +15,8 @@ import CreateActivity from './screens/CreateActivity';
 import ActivityDetail from './screens/ActivityDetail';
 import UserProfile from './screens/UserProfile';
 import OnboardingScreen from './screens/Onboarding';
+import ChatList from './screens/ChatList';
+import ChatRoom from './screens/ChatRoom';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -69,7 +72,17 @@ function MainTabs({ navigation }) {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} parentNav={navigation} />}
-      screenOptions={{ headerShown: true }}
+      screenOptions={{
+        headerShown: true,
+        headerRight: () => (
+          <TouchableOpacity
+            style={{ marginRight: 16 }}
+            onPress={() => navigation.navigate('ChatList')}
+          >
+            <MaterialIcons name="chat-bubble-outline" size={24} color="#7C5CBF" />
+          </TouchableOpacity>
+        ),
+      }}
     >
       <Tab.Screen name="Krets" component={ActivitiesScreen} />
       <Tab.Screen name="Profil" component={ProfileScreen} />
@@ -86,12 +99,10 @@ function AuthStack() {
   );
 }
 
-function OnboardingStack({ onDone }) {
+function OnboardingStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Onboarding">
-        {(props) => <OnboardingScreen {...props} onDone={onDone} />}
-      </Stack.Screen>
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
     </Stack.Navigator>
   );
 }
@@ -104,10 +115,8 @@ function MainStack() {
         name="CreateActivity"
         component={CreateActivity}
         options={{
-          title: 'Ny aktivitet',
           presentation: 'modal',
-          headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#7C5CBF',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -134,6 +143,16 @@ function MainStack() {
           presentation: 'modal',
         }}
       />
+      <Stack.Screen
+        name="ChatList"
+        component={ChatList}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ChatRoom"
+        component={ChatRoom}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
@@ -150,11 +169,11 @@ function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer key={!session ? 'auth' : needsOnboarding ? 'onboarding' : 'main'}>
       {!session ? (
         <AuthStack />
       ) : needsOnboarding ? (
-        <OnboardingStack onDone={() => setNeedsOnboarding(false)} />
+        <OnboardingStack />
       ) : (
         <MainStack />
       )}

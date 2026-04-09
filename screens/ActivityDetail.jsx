@@ -47,6 +47,26 @@ export default function ActivityDetail({ route, navigation }) {
     ]).start(() => { setMenuVisible(false); cb?.(); });
   }
 
+  async function getOrCreateChat(act) {
+    const { data } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('activity_id', act.id)
+      .limit(1);
+    if (data && data.length > 0) return data[0];
+    await supabase.from('chats').insert({ activity_id: act.id, name: act.title });
+    const { data: created } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('activity_id', act.id)
+      .limit(1);
+    if (created && created.length > 0) {
+      await supabase.from('chat_members').insert({ chat_id: created[0].id, user_id: act.user_id });
+      return created[0];
+    }
+    return null;
+  }
+
   async function fetchParticipants() {
     const { data } = await supabase
       .from('activity_participants')
@@ -115,6 +135,10 @@ export default function ActivityDetail({ route, navigation }) {
     if (error) {
       Alert.alert('Feil', error.message);
     } else {
+      let chat = await getOrCreateChat(activity);
+      if (chat) {
+        await supabase.from('chat_members').insert({ chat_id: chat.id, user_id: session.user.id });
+      }
       fetchParticipants();
     }
   }
@@ -131,6 +155,18 @@ export default function ActivityDetail({ route, navigation }) {
             .delete()
             .eq('activity_id', activity.id)
             .eq('user_id', session.user.id);
+          const { data: chats } = await supabase
+            .from('chats')
+            .select('id')
+            .eq('activity_id', activity.id)
+            .limit(1);
+          if (chats && chats.length > 0) {
+            await supabase
+              .from('chat_members')
+              .delete()
+              .eq('chat_id', chats[0].id)
+              .eq('user_id', session.user.id);
+          }
           fetchParticipants();
         },
       },

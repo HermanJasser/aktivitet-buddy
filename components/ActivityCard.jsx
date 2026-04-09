@@ -57,14 +57,21 @@ export default function ActivityCard({ activity, onPress }) {
 
   const isFull = activity.max_participants && participantCount >= activity.max_participants;
 
+  const endTime = activity.scheduled_end
+    ? new Date(activity.scheduled_end)
+    : scheduledDate
+      ? new Date(scheduledDate.getTime() + 60 * 60 * 1000)
+      : null;
+  const isPast = endTime ? new Date() > endTime : false;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={[styles.card, isPast && styles.cardPast]} onPress={onPress} activeOpacity={0.85}>
       {/* Left: image */}
       <View style={styles.imageWrapper}>
         {activity.image_url ? (
-          <Image source={{ uri: activity.image_url }} style={styles.image} />
+          <Image source={{ uri: activity.image_url }} style={[styles.image, isPast && styles.imagePast]} />
         ) : (
-          <View style={[styles.imageFallback, { backgroundColor: color }]}>
+          <View style={[styles.imageFallback, { backgroundColor: isPast ? '#ccc' : color }]}>
             <Text style={styles.imageFallbackIcon}>{icon}</Text>
           </View>
         )}
@@ -72,28 +79,31 @@ export default function ActivityCard({ activity, onPress }) {
 
       {/* Middle: info */}
       <View style={styles.content}>
-        <Text style={[styles.typeLabel, { color }]}>
+        <Text style={[styles.typeLabel, { color: isPast ? '#bbb' : color }]}>
           {(activity.type ?? 'Aktivitet').toUpperCase()}
         </Text>
-        <Text style={styles.title} numberOfLines={1}>{activity.title}</Text>
+        <Text style={[styles.title, isPast && styles.titlePast]} numberOfLines={1}>{activity.title}</Text>
         {dateLabel ? (
-          <Text style={styles.time}>🕐 {dateLabel}, {timeLabel}{endLabel ? `–${endLabel}` : ''}</Text>
+          <Text style={[styles.time, isPast && styles.timePast]}>🕐 {dateLabel}, {timeLabel}{endLabel ? `–${endLabel}` : ''}</Text>
         ) : null}
         <View style={styles.bottomRow}>
           {participantCount !== null ? (
-            <Text style={styles.participants}>
+            <Text style={[styles.participants, isPast && styles.participantsPast]}>
               👥 {participantCount}{activity.max_participants ? `/${activity.max_participants}` : ''}
-              {isFull ? '  Fullt' : ''}
             </Text>
           ) : null}
         </View>
       </View>
 
-      {isFull && (
+      {isPast ? (
+        <View style={styles.pastPill}>
+          <Text style={styles.pastPillText}>Avholdt</Text>
+        </View>
+      ) : isFull ? (
         <View style={styles.ctaPill}>
           <Text style={styles.ctaText}>Fullt</Text>
         </View>
-      )}
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -159,6 +169,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
+  cardPast: {
+    opacity: 0.6,
+  },
+  imagePast: {
+    opacity: 0.5,
+  },
+  titlePast: {
+    color: '#999',
+  },
+  timePast: {
+    color: '#bbb',
+  },
+  participantsPast: {
+    color: '#bbb',
+  },
   ctaPill: {
     borderRadius: 20,
     paddingHorizontal: 14,
@@ -170,5 +195,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 13,
+  },
+  pastPill: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexShrink: 0,
+    backgroundColor: '#f0f0f0',
+  },
+  pastPillText: {
+    color: '#999',
+    fontWeight: '600',
+    fontSize: 12,
   },
 });

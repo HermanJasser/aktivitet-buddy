@@ -13,8 +13,8 @@ import {
   Keyboard,
   Animated,
   Image,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
@@ -66,6 +66,8 @@ export default function CreateActivity({ navigation, route }) {
   });
   const [hasEndTime, setHasEndTime] = useState(!!existing?.scheduled_end);
   const [pickerMode, setPickerMode] = useState(null);
+  const pickerDateRef = useRef(new Date());
+  const skipInitialChangeRef = useRef(false);
   const [location, setLocation] = useState(
     existing?.latitude && existing?.longitude
       ? { latitude: existing.latitude, longitude: existing.longitude }
@@ -83,9 +85,6 @@ export default function CreateActivity({ navigation, route }) {
   const pickerFade = useRef(new Animated.Value(0)).current;
   const participantsScrollRef = useRef(null);
 
-  useEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, []);
 
   useEffect(() => {
     if (isEditing && existing.latitude && existing.longitude) {
@@ -112,19 +111,29 @@ export default function CreateActivity({ navigation, route }) {
   }, [pickerMode]);
 
   const openPicker = useCallback((mode) => {
+    pickerDateRef.current = mode === 'timeEnd' ? scheduledEnd : scheduledAt;
     setPickerMode(mode);
     Animated.parallel([
       Animated.timing(pickerFade, { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.timing(pickerSlide, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [scheduledAt, scheduledEnd]);
 
   const closePicker = useCallback(() => {
+    const picked = pickerDateRef.current;
+    if (pickerMode === 'date') {
+      setScheduledAt(prev => combineDateAndTime(picked, prev));
+      setScheduledEnd(prev => combineDateAndTime(picked, prev));
+    } else if (pickerMode === 'timeStart') {
+      setScheduledAt(prev => combineDateAndTime(prev, picked));
+    } else if (pickerMode === 'timeEnd') {
+      setScheduledEnd(prev => combineDateAndTime(scheduledAt, picked));
+    }
     Animated.parallel([
       Animated.timing(pickerFade, { toValue: 0, duration: 180, useNativeDriver: true }),
       Animated.timing(pickerSlide, { toValue: 400, duration: 200, useNativeDriver: true }),
     ]).start(() => setPickerMode(null));
-  }, []);
+  }, [pickerMode, scheduledAt]);
 
   async function setLocationWithLabel(coords, label = null) {
     setLocation(coords);
@@ -190,15 +199,8 @@ export default function CreateActivity({ navigation, route }) {
 
   function onDateChange(event, selectedDate) {
     if (!selectedDate) return;
-    if (pickerMode === 'date') {
-      setScheduledAt(combineDateAndTime(selectedDate, scheduledAt));
-      setScheduledEnd(combineDateAndTime(selectedDate, scheduledEnd));
-    } else if (pickerMode === 'timeStart') {
-      setScheduledAt(combineDateAndTime(scheduledAt, selectedDate));
-    } else if (pickerMode === 'timeEnd') {
-      setScheduledEnd(combineDateAndTime(scheduledAt, selectedDate));
-    }
-    if (Platform.OS === 'android') setPickerMode(null);
+    pickerDateRef.current = selectedDate;
+    if (Platform.OS === 'android') closePicker();
   }
 
   async function pickImage() {
@@ -272,13 +274,36 @@ export default function CreateActivity({ navigation, route }) {
       image_url,
     };
 
-    const { error } = isEditing
-      ? await supabase.from('activities').update(payload).eq('id', existing.id)
-      : await supabase.from('activities').insert({ ...payload, user_id: user.id });
-
-    setSaving(false);
-    if (error) { Alert.alert('Feil', error.message); }
-    else { navigation.goBack(); }
+    if (isEditing) {
+      const { error } = await supabase.from('activities').update(payload).eq('id', existing.id);
+      setSaving(false);
+      if (error) { Alert.alert('Feil', error.message); }
+      else { navigation.goBack(); }
+    } else {
+      const { data: newActivity, error } = await supabase
+        .from('activities')
+        .insert({ ...payload, user_id: user.id })
+        .select()
+        .single();
+      setSaving(false);
+      if (error) { Alert.alert('Feil', error.message); return; }
+      const { error: chatError } = await supabase
+        .from('chats')
+        .insert({ activity_id: newActivity.id, name: payload.title });
+      if (!chatError) {
+        const { data: chats } = await supabase
+          .from('chats')
+          .select('id')
+          .eq('activity_id', newActivity.id)
+          .limit(1);
+        if (chats && chats.length > 0) {
+          await supabase
+            .from('chat_members')
+            .insert({ chat_id: chats[0].id, user_id: user.id });
+        }
+      }
+      navigation.goBack();
+    }
   }
 
   const formattedDate = scheduledAt.toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -537,11 +562,12 @@ export default function CreateActivity({ navigation, route }) {
               </View>
             ) : pickerMode !== null ? (
               <DateTimePicker
-                value={pickerMode === 'timeEnd' ? scheduledEnd : scheduledAt}
+                key={pickerMode}
+                value={pickerDateRef.current}
                 mode={pickerMode === 'date' ? 'date' : 'time'}
                 display="spinner"
                 onChange={onDateChange}
-                minimumDate={pickerMode === 'date' ? new Date() : undefined}
+                minimumDate={pickerMode === 'date' ? (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })() : undefined}
                 textColor="#000000"
               />
             ) : null}
