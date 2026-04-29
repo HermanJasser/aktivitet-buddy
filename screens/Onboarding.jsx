@@ -180,7 +180,7 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
   function canProceed() {
     if (step === 1) return fullName.trim().length > 0;
     if (step === 5 && !editing) return !!birthDate && birthDate <= MAX_BIRTH_DATE;
-    return true;
+return true;
   }
 
   function renderProgressDots() {
@@ -290,7 +290,7 @@ export default function OnboardingScreen({ route, navigation, onDone }) {
         return (
           <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Når er du født?</Text>
-            <Text style={styles.stepSubtitle}>Du må være minst 18 år for å bruke appen</Text>
+            <Text style={styles.stepSubtitle}>{editing ? 'Alderen din vises på profilen din' : 'Du må være minst 18 år for å bruke appen'}</Text>
             <TouchableOpacity style={styles.dateButton} onPress={() => { if (!birthDate) setBirthDate(MAX_BIRTH_DATE); setShowDatePicker(true); }}>
               <Text style={birthDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
                 {birthDate ? birthDate.toLocaleDateString('nb-NO') : 'Velg fødselsdato'}

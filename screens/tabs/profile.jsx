@@ -64,6 +64,17 @@ export default function ProfileScreen({ navigation }) {
     ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : session?.user?.email?.[0]?.toUpperCase() ?? '?';
 
+  const age = profile?.birth_date
+    ? (() => {
+        const birth = new Date(profile.birth_date);
+        const today = new Date();
+        let a = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+        return a;
+      })()
+    : null;
+
   return (
     <>
       <Modal visible={menuVisible} transparent animationType="none" onRequestClose={() => closeMenu()}>
@@ -104,6 +115,7 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         <Text style={styles.name}>{profile?.full_name ?? session?.user?.email ?? '—'}</Text>
+        {age !== null && <Text style={styles.age}>{age} år</Text>}
 
         {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
 
@@ -178,6 +190,11 @@ const styles = StyleSheet.create({
     color: '#1A1A2E',
     marginBottom: 8,
     textAlign: 'center',
+  },
+  age: {
+    fontSize: 15,
+    color: '#888',
+    marginBottom: 6,
   },
   bio: {
     fontSize: 14,

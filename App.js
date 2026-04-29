@@ -129,11 +129,7 @@ function MainStack() {
       <Stack.Screen
         name="UserProfile"
         component={UserProfile}
-        options={{
-          title: 'Profil',
-          headerStyle: { backgroundColor: '#fff' },
-          headerTintColor: '#7C5CBF',
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="Onboarding"

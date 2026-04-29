@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, Alert, Image,
+  StyleSheet, KeyboardAvoidingView, Platform, Alert, Image, Modal, ScrollView, Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,10 @@ export default function ChatRoom({ route, navigation }) {
   const { session, profile } = useAuth();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
+  const [members, setMembers] = useState([]);
+  const [showMembers, setShowMembers] = useState(false);
+  const memberSlide = useRef(new Animated.Value(400)).current;
+  const memberFade = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -55,6 +59,31 @@ export default function ChatRoom({ route, navigation }) {
 
     return () => subscription.unsubscribe();
   }, [chat.id]);
+
+  async function fetchMembers() {
+    if (!initialChat.activity_id) return;
+    const { data } = await supabase
+      .from('activity_participants')
+      .select('profiles(id, full_name, username, avatar_url)')
+      .eq('activity_id', initialChat.activity_id);
+    if (data) setMembers(data.map(m => m.profiles).filter(Boolean));
+  }
+
+  function openMembers() {
+    fetchMembers();
+    setShowMembers(true);
+    Animated.parallel([
+      Animated.timing(memberFade, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(memberSlide, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }
+
+  function closeMembers() {
+    Animated.parallel([
+      Animated.timing(memberFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(memberSlide, { toValue: 400, duration: 200, useNativeDriver: true }),
+    ]).start(() => setShowMembers(false));
+  }
 
   async function fetchMessages() {
     const { data } = await supabase
@@ -168,13 +197,21 @@ export default function ChatRoom({ route, navigation }) {
           <Text style={styles.headerTitle} numberOfLines={1}>{chat.name}</Text>
           <Text style={styles.headerSub}>Trykk for å gi nytt navn</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.headerRight}
-          onPress={() => activity && navigation.navigate('ActivityDetail', { activity })}
-          disabled={!activity}
-        >
-          <MaterialIcons name="event" size={24} color={activity ? '#7C5CBF' : '#ccc'} />
-        </TouchableOpacity>
+        <View style={styles.headerRightGroup}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={openMembers}
+          >
+            <MaterialIcons name="group" size={24} color="#7C5CBF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => activity && navigation.navigate('ActivityDetail', { activity })}
+            disabled={!activity}
+          >
+            <MaterialIcons name="event" size={24} color={activity ? '#7C5CBF' : '#ccc'} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Messages */}
@@ -186,6 +223,45 @@ export default function ChatRoom({ route, navigation }) {
         contentContainerStyle={styles.msgList}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
+
+      {/* Members modal */}
+      <Modal visible={showMembers} transparent animationType="none" onRequestClose={closeMembers}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View style={[StyleSheet.absoluteFill, styles.modalBackdrop, { opacity: memberFade }]}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeMembers} />
+          </Animated.View>
+          <Animated.View style={[styles.membersSheet, { transform: [{ translateY: memberSlide }] }]}>
+            <View style={styles.membersHeader}>
+              <Text style={styles.membersTitle}>Medlemmer ({members.length})</Text>
+              <TouchableOpacity onPress={closeMembers}>
+                <Text style={styles.membersDone}>Ferdig</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.membersList}>
+              {members.map(m => {
+                const name = m.full_name || m.username || 'Ukjent';
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.memberRow}
+                    onPress={() => { closeMembers(); navigation.navigate('UserProfile', { userId: m.id }); }}
+                  >
+                    {m.avatar_url ? (
+                      <Image source={{ uri: m.avatar_url }} style={styles.memberAvatar} />
+                    ) : (
+                      <View style={[styles.memberAvatar, styles.memberAvatarFallback]}>
+                        <Text style={styles.memberAvatarText}>{name[0].toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.memberName}>{name}</Text>
+                    {m.id === session.user.id && <Text style={styles.memberYou}>deg</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      </Modal>
 
       {/* Input */}
       <View style={[styles.inputRow, { paddingBottom: insets.bottom + 6 }]}>
@@ -221,6 +297,8 @@ const styles = StyleSheet.create({
   },
   headerBack: { width: 48, alignItems: 'center', justifyContent: 'center' },
   headerRight: { width: 48, alignItems: 'center', justifyContent: 'center' },
+  headerRightGroup: { flexDirection: 'row' },
+  headerIconBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
   headerBackText: { fontSize: 34, color: '#7C5CBF', lineHeight: 38 },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A2E' },
@@ -295,4 +373,40 @@ const styles = StyleSheet.create({
   sendBtnText: { color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 },
   systemMsgRow: { alignItems: 'center', marginVertical: 8, paddingHorizontal: 20 },
   systemMsgText: { fontSize: 12, color: '#aaa', textAlign: 'center' },
+  modalBackdrop: { backgroundColor: 'rgba(0,0,0,0.3)' },
+  membersSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '60%',
+    paddingBottom: 32,
+  },
+  membersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  membersTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
+  membersDone: { fontSize: 16, color: '#7C5CBF', fontWeight: '600' },
+  membersList: { paddingVertical: 8 },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  memberAvatar: { width: 40, height: 40, borderRadius: 20 },
+  memberAvatarFallback: {
+    backgroundColor: '#7C5CBF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  memberName: { flex: 1, fontSize: 15, color: '#1A1A2E', fontWeight: '500' },
+  memberYou: { fontSize: 12, color: '#aaa' },
 });

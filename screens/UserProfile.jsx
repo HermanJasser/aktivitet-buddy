@@ -6,12 +6,15 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import ActivityCard from '../components/ActivityCard';
 
-export default function UserProfile({ route }) {
+export default function UserProfile({ route, navigation }) {
   const { userId } = route.params;
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,12 +54,36 @@ export default function UserProfile({ route }) {
     .toUpperCase()
     .slice(0, 2);
 
+  const age = profile?.birth_date
+    ? (() => {
+        const birth = new Date(profile.birth_date);
+        const today = new Date();
+        let a = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+        return a;
+      })()
+    : null;
+
   return (
+    <>
+      <View style={[styles.customHeader, { paddingTop: insets.top }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
+          <Text style={styles.headerBackText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profil</Text>
+        <View style={{ width: 48 }} />
+      </View>
     <FlatList
       style={styles.container}
       data={activities}
       keyExtractor={(item) => item.id.toString()}
-      renderItem={({ item }) => <ActivityCard activity={item} />}
+      renderItem={({ item }) => (
+        <ActivityCard
+          activity={item}
+          onPress={() => navigation.navigate('ActivityDetail', { activity: item })}
+        />
+      )}
       ListHeaderComponent={
         <View style={styles.header}>
           {profile?.avatar_url ? (
@@ -67,6 +94,7 @@ export default function UserProfile({ route }) {
             </View>
           )}
           <Text style={styles.name}>{displayName}</Text>
+          {age !== null && <Text style={styles.age}>{age} år</Text>}
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           <Text style={styles.sectionTitle}>Aktiviteter</Text>
         </View>
@@ -75,6 +103,7 @@ export default function UserProfile({ route }) {
         <Text style={styles.empty}>Ingen aktiviteter enda.</Text>
       }
     />
+    </>
   );
 }
 
@@ -82,6 +111,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+  },
+  headerBack: {
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBackText: {
+    fontSize: 34,
+    color: '#7C5CBF',
+    lineHeight: 38,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
   },
   center: {
     flex: 1,
@@ -118,6 +172,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#1A1A2E',
+    marginBottom: 4,
+  },
+  age: {
+    fontSize: 15,
+    color: '#888',
     marginBottom: 4,
   },
   bio: {
